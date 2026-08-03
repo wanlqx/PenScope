@@ -602,6 +602,7 @@ class Api:
                     "asset_change_alert": "0", "asset_change_notify": "1", "asset_autoscan": "0",
                     "enable_session_renew": "0",
                     "close_behavior": "minimize",
+                    "fx_enabled": "1",
                     "mouse_trail_enabled": "1", "mouse_trail_style": "light", "mouse_trail_opacity": "0.6",
                     "mouse_trail_mode": "ribbon", "mouse_trail_width": "3", "mouse_trail_fade": "0.04",
                     "mouse_trail_glow": "0.6", "mouse_trail_particles": "12", "mouse_trail_length": "8",
@@ -625,7 +626,7 @@ class Api:
                    "enable_auth_probe", "auth_probe_dict",
                    "asset_change_alert", "asset_change_notify", "asset_autoscan",
                    "enable_session_renew",
-                   "close_behavior",
+                   "close_behavior", "fx_enabled",
                    "mouse_trail_enabled", "mouse_trail_style", "mouse_trail_opacity",
                    "mouse_trail_mode", "mouse_trail_width", "mouse_trail_fade", "mouse_trail_glow",
                    "mouse_trail_particles", "mouse_trail_length",
@@ -657,7 +658,7 @@ class Api:
             elif k == "enable_session_renew":
                 # C-06：会话续期开关（开启即允许在本机加密存储目标登录凭据并自动重登）
                 clean[k] = "1" if str(v) in ("1", "true", "True") else "0"
-            elif k in ("asset_change_alert", "asset_change_notify", "asset_autoscan"):
+            elif k in ("asset_change_alert", "asset_change_notify", "asset_autoscan", "fx_enabled"):
                 clean[k] = "1" if str(v) in ("1", "true", "True") else "0"
             else:
                 clean[k] = str(v)

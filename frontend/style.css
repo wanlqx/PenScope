@@ -62,6 +62,13 @@ body{margin:0;background:var(--bg);color:var(--text);
   transition:width .2s,height .2s,border-color .2s;display:none}
 body:hover .cursor-dot,body:hover .cursor-outline{display:block}
 @media (pointer:coarse){.cursor-dot,.cursor-outline{display:none!important}}
+/* —— 视觉效果主开关（设置项 fx_enabled 关闭时生效）：隐藏所有动态/静态装饰层 —— */
+body.fx-off .scanlines,
+body.fx-off .vignette,
+body.fx-off .noise,
+body.fx-off .cursor-dot,
+body.fx-off .cursor-outline{display:none!important}
+body.fx-off .btn-glow::before{display:none!important}
 .mono{font-family:var(--f-mono);font-size:12px}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}

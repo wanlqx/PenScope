@@ -8,6 +8,7 @@
   var api = null;
   var current = { view: "dashboard", param: null };
   var settings = { language: "zh", theme: "dark", font_size: "14", layout: "comfortable",
+    fx_enabled: "1",
     mouse_trail_enabled: "1", mouse_trail_style: "light", mouse_trail_opacity: "0.6",
     mouse_trail_mode: "ribbon", mouse_trail_width: "3", mouse_trail_fade: "0.04", mouse_trail_glow: "0.6",
     mouse_trail_particles: "12", mouse_trail_length: "8",
@@ -834,9 +835,21 @@
     var bd = document.getElementById("ctx-backdrop");
     if (bd) bd.addEventListener("click", closeCtxPanel);
     // 初始化粒子网络动态背景 + 鼠标跟随按钮效果 + 鼠标拖尾（方案B 动态特效）
-    initBgFx();
-    initBtnGlow();
-    initMouseTrail();
+    // 主开关 fx_enabled：关闭后统一禁用所有动态/静态视觉效果（鼠标跟随、自定义光标、
+    // 背景粒子、扫描线、暗角、噪点、按钮光晕），恢复系统原生外观。
+    applyFxClass();
+    if (settings.fx_enabled !== "0") {
+      initBgFx();
+      initBtnGlow();
+      initMouseTrail();
+    }
+  }
+
+  // 视觉效果主开关：根据 settings.fx_enabled 切换 body.fx-off，
+  // 由 CSS 隐藏扫描线 / 暗角 / 噪点 / 自定义光标，并停用按钮光晕。
+  function applyFxClass() {
+    if (settings.fx_enabled === "0") document.body.classList.add("fx-off");
+    else document.body.classList.remove("fx-off");
   }
 
   // —— 粒子网络动态背景（增强版：更多粒子 + 特色运动 + 自适应）——
@@ -1220,6 +1233,7 @@
     document.documentElement.setAttribute("data-layout", settings.layout);
     document.documentElement.style.setProperty("--font-base", settings.font_size + "px");
     applyPanelOpacity();
+    applyFxClass();
     // 数据驱动渲染外围 chrome（顺带修复旧 map 数组漏 topology 的隐性 bug）
     renderNav();
     renderTopbar();
@@ -2407,6 +2421,10 @@
           '<select id="set-closebehavior"><option value="minimize" ' + (settings.close_behavior === "minimize" ? "selected" : "") + '>' + (settings.language === "en" ? "Minimize to tray" : "最小化到托盘") + '</option>' +
           '<option value="exit" ' + (settings.close_behavior === "exit" ? "selected" : "") + '>' + (settings.language === "en" ? "Exit application" : "完全退出") + '</option></select></div>' +
         '<p class="muted" style="margin:0">' + (settings.language === "en" ? "Minimize to tray keeps the app running in the background; Exit closes it completely." : "最小化到托盘保持应用后台运行；完全退出则关闭应用。") + '</p></div>' +
+        '<div class="card settings-group"><h3>' + (settings.language === "en" ? "Visual Effects" : "视觉效果") + '</h3>' +
+        '<div class="setting-row"><label>' + (settings.language === "en" ? "Enable visual effects" : "启用视觉效果") + '</label>' +
+          '<input type="checkbox" id="set-fx" ' + (settings.fx_enabled === "1" ? "checked" : "") + '></div>' +
+        '<p class="muted" style="margin:0">' + (settings.language === "en" ? "Master switch for all dynamic/static visual effects (mouse trail, custom cursor, background particles, scanlines, vignette, noise, button glow). Turn off for a plain native look." : "统一控制所有动态/静态视觉效果（鼠标拖尾、自定义光标、背景粒子、扫描线、暗角、噪点、按钮光晕）的总开关。关闭后恢复系统原生简洁外观。") + '</p></div>' +
         '<div class="card settings-group"><h3>' + (settings.language === "en" ? "Mouse Effects" : "鼠标特效") + '</h3>' +
         '<div class="setting-row"><label>' + (settings.language === "en" ? "Mouse trail" : "鼠标拖尾") + '</label>' +
           '<input type="checkbox" id="set-mousetrail" ' + (settings.mouse_trail_enabled === "1" ? "checked" : "") + '></div>' +
@@ -2519,6 +2537,11 @@
       if (mtChk) mtChk.addEventListener("change", function () { settings.mouse_trail_enabled = mtChk.checked ? "1" : "0"; });
       var bgChk = document.getElementById("set-bgparticles");
       if (bgChk) bgChk.addEventListener("change", function () { settings.bg_particles_enabled = bgChk.checked ? "1" : "0"; });
+      var fxChk = document.getElementById("set-fx");
+      if (fxChk) fxChk.addEventListener("change", function () {
+        settings.fx_enabled = fxChk.checked ? "1" : "0";
+        applyFxClass();  // 立即反馈：静态层（扫描线/暗角/噪点/自定义光标）实时开关；动态层（粒子/拖尾）保存刷新后生效
+      });
       // 实时预览（canvas 脱离 DOM 时自动停止，避免泄漏）
       var pv = document.getElementById("trail-preview");
       if (pv) previewTrail(pv);
@@ -2557,6 +2580,7 @@
         settings.bg_particles_enabled = document.getElementById("set-bgparticles").checked ? "1" : "0";
         settings.bg_particle_density = document.getElementById("set-bgdensity").value;
         settings.panel_opacity = document.getElementById("set-panelopacity").value;
+        settings.fx_enabled = document.getElementById("set-fx").checked ? "1" : "0";
         settings.enable_auth_probe = document.getElementById("set-authprobe").checked ? "1" : "0";
         settings.auth_probe_dict = (document.getElementById("set-authdict").value || "").trim();
         settings.asset_change_alert = document.getElementById("set-assetalert").checked ? "1" : "0";
