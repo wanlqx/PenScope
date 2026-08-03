@@ -1,7 +1,7 @@
 # PenScope —— 无后端桌面工具依赖
 # 不需要 Flask / Werkzeug（已改为 pywebview 本地前端 + JS 桥调用本地 Python 引擎）
 requests>=2.31
-pywebview>=5.0
+pywebview>=6.2.1
 pystray>=0.19
 Pillow>=10.0
 pyinstaller>=6.0   # 仅打包时需要
