@@ -1,0 +1,19 @@
+# PenScope —— Dependabot 配置
+# 每周检查 Python 依赖与 GitHub Actions 的安全 / 版本更新，自动创建 PR。
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "github-actions"

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞报告（请勿公开）
+    url: https://github.com/wanlqx/PenScope/security/advisories/new
+    about: 发现安全漏洞请走私有安全通告，不要创建公开 issue。
+  - name: 参与贡献指南
+    url: https://github.com/wanlqx/PenScope/blob/master/CONTRIBUTING.md
+    about: 了解开发环境、测试与 PR 流程。

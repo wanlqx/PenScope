@@ -4,6 +4,11 @@
 
 **正式版 v1.0.0** · 下载见 [GitHub Releases](../../releases) · 仅用于已获书面授权的渗透测试。
 
+[![CI](https://github.com/wanlqx/PenScope/actions/workflows/ci.yml/badge.svg)](https://github.com/wanlqx/PenScope/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/wanlqx/PenScope?label=release)](https://github.com/wanlqx/PenScope/releases)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 PenScope 是一款面向安全测试人员 / 授权渗透测试场景的桌面应用。它把端口扫描、Web 漏洞扫描（SQL 注入、XSS、CSRF、文件上传）、利用验证、报告生成等工作流整合在一个原生窗口中，**所有逻辑都在你本机运行**，不依赖任何远程服务器，也不需要账号密码。
 
 ---
@@ -118,3 +123,13 @@ E2E 脚本（`tests/e2e_access_auth_dvwa.py` 等）需本地起受控目标或 D
 - 扫描引擎使用参数化查询访问自身数据库，杜绝 SQL 注入。
 - 利用验证仅做「证明可利用」（时间盲注 / 错误复现），不提取数据；上传测试仅上传良性标记文件。
 - 工具定位为**只读 / 良性**扫描器：所有写入 / 延迟 / 外带类动作（命令注入时间盲注、文件上传测试）均走人工批准闸门，默认不触发；仅用于你已获授权的目标。
+
+---
+
+## 🤝 参与贡献
+
+欢迎参与 PenScope 的开发！请参阅 [CONTRIBUTING.md](CONTRIBUTING.md) 了解开发环境搭建、测试运行与 PR 流程，并遵守 [行为准则](CODE_OF_CONDUCT.md)。发现安全漏洞请按 [安全策略](SECURITY.md) **私下**报告，勿公开 Issue。
+
+## 📄 许可证
+
+本项目以 [Apache License 2.0](LICENSE) 发布。
