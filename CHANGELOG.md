@@ -8,6 +8,14 @@
 
 ---
 
+## [v1.0.2] - 2026-08-04
+
+问题修复（PATCH）—— 修复 CI / 自动发版流水线失败（无功能变更）。
+
+### 修复
+- **补齐 `cryptography` 运行依赖声明**：`scanner.vault` / `scanner.session_renew` 依赖 Fernet 加密凭据保险库，但此前 `requirements.txt` 未声明该依赖，导致 CI 干净环境 `import` 失败、pytest 与 PyInstaller 构建双双报错。已在 `requirements.txt` 增加 `cryptography>=41.0` 并重新生成 `requirements-lock.txt`（含 `cryptography==50.0.0`）。
+- **统一 CI / 发版 Python 版本为 3.13**：原 `requirements-lock.txt` 由 pip-compile 在 Python 3.13 生成，而工作流固定使用 3.11，导致锁文件在 runner 上部分失效、依赖版本漂移。现 CI 与 Release 工作流均使用 `python-version: "3.13"`，与锁文件及本地构建环境一致。
+
 ## [v1.0.1] - 2026-08-03
 
 问题修复（PATCH）。

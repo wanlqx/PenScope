@@ -11,11 +11,15 @@ bottle==0.13.4
 certifi==2026.7.22
     # via requests
 cffi==2.1.0
-    # via clr-loader
+    # via
+    #   clr-loader
+    #   cryptography
 charset-normalizer==3.4.9
     # via requests
 clr-loader==0.3.1
     # via pythonnet
+cryptography==50.0.0
+    # via -r requirements.txt
 idna==3.18
     # via requests
 packaging==26.2
