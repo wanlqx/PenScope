@@ -128,7 +128,28 @@ _session.headers.update({"User-Agent": "PenScope/1.0 (authorized security test)"
 
 # 同 IP 多 vhost 端口探测复用缓存：以「解析 IP + 端口集合」为键，避免对共享公网 IP 的
 # 多个子域重复做整轮端口扫描（仅复用端口结果，vhost 级 Web 检测仍逐主机执行）。
-_PORT_CACHE = {}
+# 带 TTL（默认 30 分钟）+ 最大容量（默认 1024 条）淘汰，防止长期运行无限增长（L-01）。
+_PORT_CACHE = {}        # key -> (value, timestamp)
+_PORT_CACHE_TTL = 1800  # 30 分钟过期
+_PORT_CACHE_MAX = 1024  # 最大条数，超出淘汰最旧
+
+
+def _port_cache_get(key):
+    item = _PORT_CACHE.get(key)
+    if item is None:
+        return None
+    val, ts = item
+    if time.time() - ts > _PORT_CACHE_TTL:
+        _PORT_CACHE.pop(key, None)
+        return None
+    return val
+
+
+def _port_cache_set(key, val):
+    if len(_PORT_CACHE) >= _PORT_CACHE_MAX:
+        oldest = min(_PORT_CACHE, key=lambda k: _PORT_CACHE[k][1])
+        _PORT_CACHE.pop(oldest, None)
+    _PORT_CACHE[key] = (val, time.time())
 
 
 def _resolve_ip(host):
@@ -221,14 +242,15 @@ def _stage_recon(scan):
     # vhost 级 Web 检测仍在后续 web_detect 阶段逐主机执行）。
     ip = _resolve_ip(host)
     cache_key = (ip, tuple(sorted(ports))) if ip else None
-    if cache_key is not None and cache_key in _PORT_CACHE:
-        open_ports = _PORT_CACHE[cache_key]
+    cached = _port_cache_get(cache_key) if cache_key is not None else None
+    if cached is not None:
+        open_ports = cached
         audit(scan["created_by"], "port_scan_cache_hit", host,
               f"解析 IP {ip} 命中端口探测缓存，复用 {len(open_ports)} 个开放端口（避免重复扫描）")
     else:
         open_ports = scan_ports(host, ports, DEFAULT_TIMEOUT)
         if cache_key is not None:
-            _PORT_CACHE[cache_key] = open_ports
+            _port_cache_set(cache_key, open_ports)
     web_targets = fingerprint_web(host, [p["port"] for p in open_ports], verify_ssl=vs)
     for op in open_ports:
         add_finding(scan["id"], "资产暴露", f"开放端口 {op['port']}/{op['service']}",

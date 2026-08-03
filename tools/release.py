@@ -40,6 +40,17 @@ def _sh(cmd, cwd=ROOT, check=True):
     return subprocess.run(cmd, cwd=cwd, check=check, shell=False)
 
 
+# git 标签名 / 分支名等外部引用的允许字符集（拒绝空格、引号、分号、$() 等注入风险字符）
+_REF_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
+
+
+def _safe_ref(name, what="引用"):
+    """校验 git 标签名 / 分支名等外部引用，拒绝含 shell/路径注入风险的字符。"""
+    if not _REF_RE.match(name or ""):
+        raise SystemExit("%s含非法字符，已拒绝执行：%r" % (what, name))
+    return name
+
+
 def read_app_info():
     """从 config.py 读取 APP_NAME 与 VERSION（唯一来源）。"""
     txt = open(CONFIG, encoding="utf-8").read()
@@ -98,6 +109,7 @@ def read_notes():
 def tag(message=None):
     name, ver = read_app_info()
     tagname = "v" + ver
+    _safe_ref(tagname, "标签名")
     msg = message or ("%s %s" % (name, tagname))
     _sh(["git", "tag", "-a", tagname, "-m", msg], cwd=ROOT)
     print("已打标签", tagname)

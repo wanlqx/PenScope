@@ -8,6 +8,9 @@ import requests
 from scanner.vuln_db import match_vulns
 from scanner.scope import redirect_target_blocked
 
+import logging
+log = logging.getLogger(__name__)
+
 # 端口 -> 常见服务名
 PORT_SERVICES = {
     21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns", 80: "http",
@@ -96,8 +99,8 @@ def _verify_banner(sock, port, banner, timeout):
             sock.sendall(probe)
             resp = sock.recv(1024)
             return resp.decode("utf-8", "ignore")
-    except Exception:
-        pass
+    except Exception as exc:  # 探测失败（超时/对端断开/协议不支持）均静默回退到原 banner，但留痕便于排查
+        log.debug("banner 验证探测失败 port=%s: %s", port, exc)
     return banner
 
 

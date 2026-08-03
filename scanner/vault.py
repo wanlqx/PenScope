@@ -37,6 +37,27 @@ def _vault_paths():
     )
 
 
+def _harden_key_permissions(path):
+    """收窄密钥文件权限（L-04）：
+    - Windows：用 icacls 去除继承并仅授权当前用户只读，阻止同机其他用户读取密钥；
+    - 非 Windows：沿用 POSIX chmod 0600。
+    失败仅告警，不阻断（密钥已生成，后续读取仍由本用户完成）。"""
+    try:
+        if os.name == "nt":
+            import subprocess
+            user = os.environ.get("USERNAME") or os.environ.get("USER")
+            if user:
+                # /inheritance:r 去掉继承；/grant:r 仅授予当前用户读取(R)，覆盖原有 ACE
+                subprocess.run(
+                    ["icacls", path, "/inheritance:r", "/grant:r", "%s:(R)" % user],
+                    check=False, capture_output=True,
+                )
+        else:
+            os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
 class VaultError(Exception):
     """保险库不可用（如缺少加密依赖且无可降级路径）。"""
 
@@ -70,10 +91,7 @@ class Vault:
         try:
             with open(self._key_path, "wb") as f:
                 f.write(self._master_key)
-            try:
-                os.chmod(self._key_path, 0o600)
-            except OSError:
-                pass  # Windows 上 chmod 部分生效，忽略
+            _harden_key_permissions(self._key_path)
         except OSError as e:  # pragma: no cover
             raise VaultError(f"无法写入密钥文件 {self._key_path}: {e}")
         return self._master_key

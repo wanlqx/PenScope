@@ -15,8 +15,10 @@ import sys
 import json
 import platform
 import datetime
+import logging
 
 import config
+log = logging.getLogger(__name__)
 from db import (
     init_db, list_targets, add_target, approve_target, reject_target,
     get_target, create_scan, list_scans, get_scan, findings_of,
@@ -237,6 +239,7 @@ class Api:
             from scanner.vault import VaultError
             if isinstance(e, VaultError):
                 return _err("E_INTERNAL", "保险库不可用", str(e))
+            log.warning("保存认证配置失败（非保险库错误）: %s", e)
             return _err("E_INTERNAL", "保存认证配置失败", str(e))
 
     def get_auth_profile(self, tid):
@@ -654,6 +657,15 @@ class Api:
                 clean[k] = "1" if str(v) in ("1", "true", "True") else "0"
             elif k == "auth_probe_dict":
                 s = str(v or "").strip()
+                if s:
+                    # L-06：弱口令字典路径校验，避免越界读取系统目录或非文件
+                    p = os.path.normpath(os.path.abspath(s))
+                    if not os.path.isfile(p):
+                        return _err("E_INVALID", "弱口令字典路径不存在或不是常规文件", p)
+                    _sys_dirs = (r"\windows\system32", r"\windows\syswow64",
+                                 r"\windows\systemapps", r"\windows\winxs")
+                    if any(seg in p.lower() for seg in _sys_dirs):
+                        return _err("E_INVALID", "弱口令字典路径位于受限系统目录", p)
                 clean[k] = s
             elif k == "enable_session_renew":
                 # C-06：会话续期开关（开启即允许在本机加密存储目标登录凭据并自动重登）

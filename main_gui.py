@@ -67,7 +67,7 @@ def _open_data_folder():
     d = config.BASE_DIR
     try:
         if sys.platform.startswith("win"):
-            os.startfile(d)  # noqa: S606 (仅打开本机已知目录)
+            os.startfile(os.path.normpath(d))  # noqa: S606 (仅打开本机已知目录，已 normpath 规范化)
         else:
             import webbrowser
             webbrowser.open(f"file://{d}")
