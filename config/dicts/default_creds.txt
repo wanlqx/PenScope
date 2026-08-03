@@ -1,0 +1,26 @@
+# PenScope —— 默认凭据字典（C-05 外置）
+#
+# 用途：仅用于 opt-in 的"默认凭据探测"（config.ENABLE_AUTH_PROBE / 设置项
+# enable_auth_probe 开启时）。命中即报告为弱默认凭据，不穷举、不爆破。
+#
+# 格式：每行 `用户名:密码`。以 # 开头的行与空行会被忽略。
+# 自定义：在"设置 → 弱口令探测"中填入自定义字典路径，或设置 config.AUTH_PROBE_DICT_PATH，
+# 即可整体替换本文件（用户导入）。加载器会自动去重、去空白、丢弃无冒号/超长行，并限制条数。
+#
+# 安全声明：本字典仅含最常见的默认/弱凭据示例。主动探测属半攻击行为，可能触发账号锁定，
+# 仅可在取得书面授权后对自有/授权资产使用。
+
+admin:admin
+admin:password
+admin:admin123
+admin:123456
+root:root
+root:password
+administrator:administrator
+guest:guest
+test:test
+admin:admin@123
+user:user
+sa:sa
+postgres:postgres
+admin:letmein

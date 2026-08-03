@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PenScope</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- 粒子网络动态背景层（z-index:0，位于所有面板之下；面板不透明，仅在缝隙处可见） -->
+<canvas id="bg-fx" aria-hidden="true"></canvas>
+
+<!-- CRT 扫描线 + 暗角 + 噪点纹理（参考 vulnclaw.com 赛博朋克风格） -->
+<div class="scanlines" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+<div class="noise" aria-hidden="true"></div>
+
+<!-- 自定义光标（红点 + 轮廓） -->
+<div class="cursor-dot" id="cursor-dot" aria-hidden="true"></div>
+<div class="cursor-outline" id="cursor-outline" aria-hidden="true"></div>
+
+<a class="skip-link" href="#view">跳到主内容</a>
+
+<!-- 方案B：48px 图标导航栏 rail（悬停展开 tooltip） -->
+<aside class="rail" id="sidebar">
+  <div class="brand" title="PenScope" aria-label="PenScope">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 2 L20 5 V11 C20 16 16.5 20 12 22 C7.5 20 4 16 4 11 V5 Z" fill="currentColor" opacity="0.18"/>
+      <path d="M12 2 L20 5 V11 C20 16 16.5 20 12 22 C7.5 20 4 16 4 11 V5 Z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+      <path d="M9 12 L11.2 14.2 L15.4 10" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <nav id="nav" role="navigation" aria-label="主导航"></nav>
+  <div class="side-foot" title="本地桌面工具 · 无需登录">AI</div>
+</aside>
+
+<!-- 顶栏：标题 + 环境徽标 + 命令面板入口 + 时钟 + 告警铃 + 刷新 -->
+<header class="topbar" id="topbar">
+  <div class="tb-title" id="tb-title">PenScope</div>
+  <span class="tb-sep" aria-hidden="true"></span>
+  <span class="tb-env" title="本地运行环境" aria-label="本地环境"><span class="dot"></span>LOCAL</span>
+  <div class="tb-search" id="tb-search" title="Ctrl+K" role="button" tabindex="0" aria-label="命令面板">
+    <span class="ico">⌘K</span>
+    <input id="tb-search-input" readonly aria-label="命令面板">
+  </div>
+  <span class="tb-spacer" aria-hidden="true"></span>
+  <span class="tb-clock" id="tb-clock" aria-label="当前时间">--:--:--</span>
+  <button class="tb-bell" id="tb-bell" title="待复核闸门" aria-label="待复核闸门"><span class="ping" aria-hidden="true"></span>🔔</button>
+  <button class="tb-btn btn-glow" id="tb-reload" title="刷新当前视图" aria-label="刷新">↻</button>
+</header>
+
+<main id="view" role="main" tabindex="-1">
+  <div class="empty"><span class="spinner"></span>正在加载…</div>
+</main>
+<footer class="statusbar" id="statusbar" role="contentinfo"></footer>
+
+<!-- 漏洞详情抽屉（替代发现弹窗，4 Tab 组织） -->
+<div class="ctx-backdrop" id="ctx-backdrop" aria-hidden="true"></div>
+<aside class="ctx-panel" id="ctx-panel" role="complementary" aria-hidden="true"></aside>
+
+<!-- 命令面板（⌘K） -->
+<div class="cmd-overlay hidden" id="cmd-overlay" role="dialog" aria-modal="true" aria-label="命令面板"></div>
+
+<div id="modal-root"></div>
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

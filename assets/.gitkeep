@@ -1,0 +1,1 @@
+# 保留 assets/ 目录。icon.ico 与 tray.png 由 make_icon.py 在构建时再生，不提交二进制资源。

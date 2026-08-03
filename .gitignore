@@ -1,0 +1,59 @@
+# ============================================================
+# PenScope —— Git 忽略规则
+# 原则：源码与可再生的资源入库；密钥、用户数据、日志、调试/训练产物、构建产物一律不入库。
+# ============================================================
+
+# ---- 构建产物（exe / PyInstaller 临时） ----
+dist/
+build/
+*.spec.bak
+# 发布用的 exe 走 GitHub Release 资产，不入 git 历史
+*.exe
+
+# ---- 运行时用户数据（含扫描目标、发现、日志） ----
+*.db
+*.db-shm
+*.db-wal
+autopentest.db
+autopentest.db-shm
+autopentest.db-wal
+autopentest.log
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# ---- 密钥 / 凭据 / 敏感配置（严禁入库） ----
+*.key
+autopentest.key
+autopentest_vault.json
+*vault*.json
+.env
+.env.*
+# 提示：运行时密钥由程序在 exe 同级目录自动生成（Fernet），前端永不拿到明文密码。
+# 切勿将 AUTOPENTEST_VAULT_KEY 或任何真实凭据提交到仓库。
+
+# ---- 调试 / 训练 / 一次性产物（与应用发布无关） ----
+bug_report.json
+bug_report.md
+fix_proposal.json
+_u04_transform.py
+knowledge_feed/
+.workbuddy/
+
+# ---- 二进制资源（由 make_icon.py 在构建时再生，见 build_nowrap.py） ----
+assets/icon.ico
+assets/tray.png
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# ---- 系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
