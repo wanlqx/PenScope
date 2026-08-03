@@ -11,11 +11,27 @@
 """
 import datetime
 import json
+import logging
 import re
 import sqlite3
 import threading
 
 from config import DB_PATH
+
+# 模块日志器：结构化日志上下文（scan_id / target_id）由 _ctx() 绑定，
+# 经 main_gui._CtxFormatter 渲染到行尾，便于问题追踪与聚合。
+_log = logging.getLogger("PenScope.db")
+
+
+def _ctx(scan_id=None, target_id=None):
+    """返回一个绑定了 scan_id/target_id 上下文的 LoggerAdapter（无上下文时返回原 logger）。"""
+    extra = {}
+    if scan_id is not None:
+        extra["scan_id"] = scan_id
+    if target_id is not None:
+        extra["target_id"] = target_id
+    return logging.LoggerAdapter(_log, extra) if extra else _log
+
 
 # 全局写锁：所有写事务串行执行，保证跨线程数据一致性（RLock 防止同线程重入死锁）
 _db_lock = threading.RLock()
@@ -461,6 +477,7 @@ def create_scan(target_id, name, created_by, schedule_id=None):
         sid = cur.lastrowid
         c.commit()
         c.close()
+        _ctx(sid, target_id).info("新建扫描 #%s target=%s name=%s by=%s", sid, target_id, name, created_by)
         return sid
 
 
@@ -661,6 +678,7 @@ def add_finding(scan_id, category, title, risk, detail, evidence, remediation, t
        证据等级更高、证据更详尽）。
     这样可根治「同一端口/同一注入点被多次报告」的问题，同时避免误删真正不同的发现。
     """
+    _ctx(scan_id).debug("add_finding %s/%s risk=%s loc=%s", category, title, risk, endpoint or target_ref)
     from cvss_dedup import cvss_for, evidence_strength, finding_id_of, finding_similarity
 
     if cvss_score is None or cvss_score == "":
@@ -725,6 +743,7 @@ def add_finding(scan_id, category, title, risk, detail, evidence, remediation, t
                 )
                 c.commit()
                 c.close()
+                _ctx(scan_id).info("发现去重合并 -> #%s: %s/%s", ex_id, category, title)
                 return ex_id
         cur = c.execute(
             "INSERT INTO findings (scan_id, category, title, risk, detail, evidence, remediation, "
@@ -738,6 +757,7 @@ def add_finding(scan_id, category, title, risk, detail, evidence, remediation, t
         c.commit()
         fid = cur.lastrowid
         c.close()
+        _ctx(scan_id).info("新增发现 #%s: %s/%s risk=%s", fid, category, title, risk)
         return fid
 
 
@@ -861,6 +881,7 @@ def set_finding_fix_status(fid, status):
         cur = c.execute("UPDATE findings SET fix_status=? WHERE id=?", (status, int(fid)))
         c.commit()
         c.close()
+        _log.info("发现 #%s 修复状态 -> %s", fid, status)
         return cur.rowcount > 0
 
 

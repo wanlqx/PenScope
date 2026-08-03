@@ -31,6 +31,34 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=_handlers,
 )
+
+
+class _CtxFormatter(logging.Formatter):
+    """结构化日志格式化器：当日志记录携带 scan_id / target_id / worker 上下文时，
+    在行尾追加 [scan=.. target=.. worker=..]，便于问题追踪与日志聚合。
+    未携带上下文的记录（多数应用日志）保持原样，不引入噪音。
+    """
+
+    def format(self, record):
+        s = super().format(record)
+        scan = getattr(record, "scan_id", None)
+        tid = getattr(record, "target_id", None) or getattr(record, "target", None)
+        worker = getattr(record, "worker", None)
+        parts = []
+        if scan and scan != "-":
+            parts.append("scan=%s" % scan)
+        if tid and tid != "-":
+            parts.append("target=%s" % tid)
+        if worker and worker != "-":
+            parts.append("worker=%s" % worker)
+        if parts:
+            s += "  [" + " ".join(parts) + "]"
+        return s
+
+
+for _h in logging.getLogger().handlers:
+    _h.setFormatter(_CtxFormatter("%(asctime)s [%(levelname)s] %(message)s"))
+
 log = logging.getLogger("PenScope")
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
