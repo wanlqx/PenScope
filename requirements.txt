@@ -2,7 +2,7 @@
 # 不需要 Flask / Werkzeug（已改为 pywebview 本地前端 + JS 桥调用本地 Python 引擎）
 requests>=2.31
 pywebview>=5.0
-pystray>=0.19
+pystray>=0.19.5
 Pillow>=10.0
 pyinstaller>=6.0   # 仅打包时需要
 # weasyprint>=60.0  # 可选：如需在应用内直接生成 PDF 报告，安装后可启用（较重，Windows 需额外 GTK 依赖）
