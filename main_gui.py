@@ -10,6 +10,7 @@ import os
 import sys
 import time
 import logging
+import logging.handlers
 import threading
 import ctypes
 from ctypes import wintypes
@@ -20,8 +21,10 @@ import run_scans
 import app_api
 
 # ---------------- 文件日志（替代控制台，避免 --windowed 下无输出） ----------------
+# 使用 RotatingFileHandler：单文件上限 10MB，保留最近 5 个备份，防止日志无限增长占满磁盘。
 _LOG_PATH = os.path.join(config.BASE_DIR, "autopentest.log")
-_handlers = [logging.FileHandler(_LOG_PATH, encoding="utf-8")]
+_handlers = [logging.handlers.RotatingFileHandler(
+    _LOG_PATH, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8")]
 if sys.stdout is not None:
     _handlers.append(logging.StreamHandler())
 logging.basicConfig(

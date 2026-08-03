@@ -60,3 +60,16 @@ python build_nowrap.py       # PyInstaller 单文件构建
 ## 5. 安全相关改动
 
 涉及凭据、授权围栏、扫描逻辑的改动需额外谨慎，并在 PR 中说明安全影响。发现漏洞请按 [SECURITY.md](SECURITY.md) 流程**私下**报告，勿公开 Issue。
+
+## 6. 插件开发与安全
+
+PenScope 支持通过 `scanner.plugins.load_plugins()` 加载扩展扫描器（继承 `scanner.plugin_base.BaseScanner`）：
+
+- **内置示例**：`scanner/plugins/example_headers.py`，随包发布以证明框架可用。
+- **外部插件**：把 `.py` 放入 `~/.autopentest/plugins/` 即被自动发现并接入扫描流水线。
+
+> ⚠️ **信任边界（重要）**：外部插件在应用启动时由 `importlib` **直接执行任意 Python 代码**，拥有与 PenScope 相同的当前用户权限。
+> 因此：
+> 1. 只从**可信来源**获取并安装插件；不要运行来源不明或未经审查的插件文件。
+> 2. 插件可访问本机文件系统、网络与凭据保险库所在进程，请将其视为一等代码执行点对待。
+> 3. 长期计划：将插件放入**独立子进程**中隔离运行（沙箱 / 最小权限），降低对主进程的信任暴露面。当前版本尚未实现该隔离。

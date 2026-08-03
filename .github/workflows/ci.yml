@@ -1,5 +1,10 @@
 # PenScope —— CI 测试 / 代码质量 / 安全扫描
 # 触发：推送到 master/main、针对 master/main 的 PR
+#
+# 门禁策略（见仓库改进路线图 P1 / 用户评审）：
+# - 测试（pytest）：必须通过（硬门禁），保证每次合并不破坏核心逻辑。
+# - 代码质量（ruff）/ 安全（bandit、pip-audit）：作为「告警」运行，不阻断 PR；
+#   安全扫描应提示风险而非阻断交付，按项目风险偏好后续可升级为必须。
 name: CI
 
 on:
@@ -24,19 +29,19 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install dependencies (lockfile with fallback)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-lock.txt || pip install -r requirements.txt
           pip install pytest
 
-      - name: Run tests
+      - name: Run tests (required gate)
         # 仅运行无需显示/网络的纯逻辑测试，保证 CI 稳定通过；
         # 其余涉及 GUI / 靶机的测试请在本机手动运行（见 CONTRIBUTING.md）。
         run: python -m pytest tests/test_session_vault.py tests/test_hardening.py tests/test_cred_dict.py tests/smoke_nobackend.py tests/test_scope_redirect.py tests/test_vuln_i18n.py -q
 
   quality:
-    name: 代码质量与安全扫描
+    name: 代码质量与安全扫描 (warn)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -52,11 +57,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install ruff bandit pip-audit
 
-      - name: Ruff lint
-        run: ruff check . || true
+      - name: Ruff lint (warn, non-blocking)
+        continue-on-error: true
+        run: ruff check .
 
-      - name: Bandit security scan
-        run: bandit -r scanner app_api.py -ll || true
+      - name: Bandit security scan (warn, non-blocking)
+        continue-on-error: true
+        run: bandit -r scanner app_api.py -ll
 
-      - name: pip-audit dependency scan
-        run: pip-audit -r requirements.txt || true
+      - name: pip-audit dependency scan (warn, non-blocking)
+        continue-on-error: true
+        run: pip-audit -r requirements-lock.txt || pip-audit -r requirements.txt

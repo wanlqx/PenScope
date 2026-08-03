@@ -1209,7 +1209,8 @@ def db_stats():
     t = c.execute("SELECT COUNT(*) FROM targets").fetchone()[0]
     s = c.execute("SELECT COUNT(*) FROM scans").fetchone()[0]
     f = c.execute("SELECT COUNT(*) FROM findings").fetchone()[0]
-    f_done = c.execute("SELECT COUNT(*) FROM findings WHERE fix_status='done'").fetchone()[0]
+    # fix_status 取值为 'open' / 'verifying' / 'fixed' / 'wont_fix'，统计"已修复"应使用 'fixed'
+    f_done = c.execute("SELECT COUNT(*) FROM findings WHERE fix_status='fixed'").fetchone()[0]
     a = c.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
     c.close()
     return {

@@ -348,6 +348,11 @@ async def _detect_page_async(page, vs, pg, scan, renewal=None):
             return cat, await asyncio.to_thread(fn, s)
         except Exception as e:  # 单个扫描器异常不影响其它
             return cat, e
+        finally:
+            # 仅关闭本次新建的裸会话；续期会话由 renewal 自身管理，不可关闭，
+            # 否则并发扫描会复用已关闭的连接，导致资源泄露 / 请求失败（并发边界硬化）。
+            if renewal is None:
+                s.close()
 
     results = await asyncio.gather(*[_run(c, f) for c, f in _jobs()])
     uploads, sql_h, cmd_h = [], 0, 0
