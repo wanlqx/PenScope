@@ -4,7 +4,9 @@
 - 仅做被动 GET 并检查响应头；
 - 缺失 HSTS / X-Content-Type-Options 时产出 Info 级发现；
 - 零写入、零误报风险，用于验证插件框架端到端可用。
-二次开发者可复制本文件结构编写自己的插件，放入 ~/.autopentest/plugins/ 即可启用。
+二次开发者可复制本文件结构编写自己的插件。注意：外部插件默认处于「严格信任」模式，
+放入 ~/.autopentest/plugins/ 后还需先登记信任才会被加载：
+    python -m scanner.plugins trust ~/.autopentest/plugins/你的插件.py
 """
 from scanner.plugin_base import BaseScanner
 

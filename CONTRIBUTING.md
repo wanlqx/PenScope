@@ -100,11 +100,23 @@ CI / 发布构建优先使用 `requirements-lock.txt`，失败时回退到 `requ
 
 PenScope 支持通过 `scanner.plugins.load_plugins()` 加载扩展扫描器（继承 `scanner.plugin_base.BaseScanner`）：
 
-- **内置示例**：`scanner/plugins/example_headers.py`，随包发布以证明框架可用。
-- **外部插件**：把 `.py` 放入 `~/.autopentest/plugins/` 即被自动发现并接入扫描流水线。
+- **内置示例**：`scanner/plugins/example_headers.py`，随包发布、受信，始终自动加载。
+- **外部插件**：把 `.py` 放入 `~/.autopentest/plugins/`，但**默认处于「严格信任」模式**，
+  落盘的文件不会自动执行，必须先显式登记信任才会加载：
 
-> ⚠️ **信任边界（重要）**：外部插件在应用启动时由 `importlib` **直接执行任意 Python 代码**，拥有与 PenScope 相同的当前用户权限。
+  ```bash
+  python -m scanner.plugins trust ~/.autopentest/plugins/你的插件.py   # 登记/更新信任（记录 SHA-256）
+  python -m scanner.plugins list                                       # 列出已信任插件
+  python -m scanner.plugins verify                                     # 校验哈希是否仍匹配（篡改检测）
+  ```
+
+  登记会将插件文件的 SHA-256 写入 `~/.autopentest/plugins/manifest.json`；之后该文件被改动（篡改）将**拒绝加载**。
+  信任模式由 `config.PLUGIN_TRUST_MODE` 控制：`strict`（默认）/ `warn`（加载未登记插件但高亮告警）/ `off`（不加载外部插件），
+  环境变量 `PENSCOPE_PLUGIN_TRUST` 可临时覆盖。
+
+> ⚠️ **信任边界（重要）**：外部插件在被加载时由 `importlib` **直接执行任意 Python 代码**，拥有与 PenScope 相同的当前用户权限。
 > 因此：
 > 1. 只从**可信来源**获取并安装插件；不要运行来源不明或未经审查的插件文件。
 > 2. 插件可访问本机文件系统、网络与凭据保险库所在进程，请将其视为一等代码执行点对待。
-> 3. 长期计划：将插件放入**独立子进程**中隔离运行（沙箱 / 最小权限），降低对主进程的信任暴露面。当前版本尚未实现该隔离。
+> 3. 严格信任白名单 + 完整性哈希已是**中期隔离**手段（杜绝静默任意代码执行与篡改）；
+>    长期计划：将插件放入**独立子进程**中隔离运行（沙箱 / 最小权限 / JSON-RPC 通信），进一步降低对主进程的信任暴露面。当前版本尚未实现该子进程隔离。

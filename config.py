@@ -23,6 +23,14 @@ VERSION = "1.0.0"
 # F-08：插件化框架总开关。关闭后不加载/运行任何插件扫描器（含内置示例）。
 ENABLE_PLUGINS = True
 
+# 插件信任模式（外部插件 ~/.autopentest/plugins/*.py 的加载策略）：
+#   strict（默认）：仅加载「已显式信任且其 SHA-256 与登记值一致」的外部插件；
+#                   任意未登记/被篡改的文件不会自动执行（杜绝静默任意代码执行）。
+#   warn：加载全部外部插件但高亮告警（兼容旧行为 / 本地开发用）。
+#   off：完全不加载外部插件。
+# 环境变量 PENSCOPE_PLUGIN_TRUST 可临时覆盖。通过 `python -m scanner.plugins trust <file>` 登记信任。
+PLUGIN_TRUST_MODE = os.environ.get("PENSCOPE_PLUGIN_TRUST", "strict").lower()
+
 # 数据库文件（存放在可执行文件目录下，保证可写）
 DB_PATH = os.environ.get("AUTOPENTEST_DB", os.path.join(BASE_DIR, "autopentest.db"))
 
