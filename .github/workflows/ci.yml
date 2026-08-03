@@ -43,7 +43,7 @@ jobs:
       - name: Run tests (required gate)
         # 仅运行无需显示 / 网络的纯逻辑测试，保证 CI 稳定通过；
         # 其余涉及 GUI / 靶机的测试请在本机手动运行（见 CONTRIBUTING.md）。
-        run: python -m pytest tests/test_session_vault.py tests/test_hardening.py tests/test_cred_dict.py tests/smoke_nobackend.py tests/test_scope_redirect.py tests/test_vuln_i18n.py -q
+        run: python -m pytest tests/test_session_vault.py tests/test_hardening.py tests/test_cred_dict.py tests/smoke_nobackend.py tests/test_scope_redirect.py tests/test_vuln_i18n.py tests/test_db_stats.py -q
 
   lint:
     name: 代码质量 (ruff, 必过)
