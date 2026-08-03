@@ -32,12 +32,13 @@ autopentest_vault.json
 # 提示：运行时密钥由程序在 exe 同级目录自动生成（Fernet），前端永不拿到明文密码。
 # 切勿将 AUTOPENTEST_VAULT_KEY 或任何真实凭据提交到仓库。
 
-# ---- 调试 / 训练 / 一次性产物（与应用发布无关） ----
+# ---- 调试 / 训练 / 预发布产物（与应用发布无关） ----
 bug_report.json
 bug_report.md
 fix_proposal.json
 _u04_transform.py
 knowledge_feed/
+frontend/prototypes/
 .workbuddy/
 
 # ---- 二进制资源（由 make_icon.py 在构建时再生，见 build_nowrap.py） ----
