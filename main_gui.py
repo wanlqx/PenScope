@@ -121,11 +121,74 @@ def _get_hwnd():
     return None
 
 
+def _activate_existing_instance():
+    """已有实例运行时，可靠地把其窗口带到前台（规避 Windows 前台锁）。
+
+    用于多实例保护：新实例检测到互斥锁已存在时，激活已有窗口而非重复启动。
+    单纯 ShowWindow + SetForegroundWindow 在跨进程时常被系统前台锁拦截，导致"重复点击
+    启动器却看不见窗口"，必须借助 AllowSetForegroundWindow / AttachThreadInput 桥接。
+    """
+    try:
+        hwnd = ctypes.windll.user32.FindWindowW(None, _WINDOW_TITLE)
+        if not hwnd:
+            return False
+        ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        # 本进程申请置前权限后尝试；失败则桥接当前前台线程，强制置前
+        try:
+            ctypes.windll.user32.AllowSetForegroundWindow(
+                ctypes.windll.kernel32.GetCurrentProcessId())
+        except Exception:
+            pass
+        if not ctypes.windll.user32.SetForegroundWindow(hwnd):
+            try:
+                fg = ctypes.windll.user32.GetForegroundWindow()
+                if fg:
+                    fg_tid = ctypes.windll.user32.GetWindowThreadProcessId(fg, None)
+                    cur_tid = ctypes.windll.kernel32.GetCurrentThreadId()
+                    attached = ctypes.windll.user32.AttachThreadInput(cur_tid, fg_tid, True)
+                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+                    if attached:
+                        ctypes.windll.user32.AttachThreadInput(cur_tid, fg_tid, False)
+            except Exception:
+                pass
+        return True
+    except Exception:
+        return False
+
+
+def exit_app():
+    """干净退出：停止托盘、销毁窗口、强制终止进程。
+
+    供托盘「退出」与应用内「退出」按钮共用。幂等：多次调用安全。
+    """
+    global _closing, tray_icon, window
+    if _closing:
+        return
+    _closing = True
+    log.info("应用请求退出")
+    try:
+        if tray_icon is not None:
+            tray_icon.stop()
+    except Exception:
+        pass
+    try:
+        if window is not None:
+            window.destroy()
+    except Exception:
+        pass
+    os._exit(0)
+
+
 def on_tray_show():
     hw = _get_hwnd()
     if hw:
         try:
             ctypes.windll.user32.ShowWindow(hw, 9)   # SW_RESTORE
+            try:
+                ctypes.windll.user32.AllowSetForegroundWindow(
+                    ctypes.windll.kernel32.GetCurrentProcessId())
+            except Exception:
+                pass
             ctypes.windll.user32.SetForegroundWindow(hw)
         except Exception:
             pass
@@ -142,22 +205,7 @@ def on_tray_settings():
 
 
 def on_tray_exit():
-    global tray_icon, _closing
-    if _closing:
-        return
-    _closing = True
-    log.info("通过托盘菜单退出")
-    try:
-        if tray_icon:
-            tray_icon.stop()
-    except Exception:
-        pass
-    try:
-        if window:
-            window.destroy()
-    except Exception:
-        pass
-    os._exit(0)
+    exit_app()
 
 
 def _on_gate(kind, note, scan_id=None, target_id=None):
@@ -216,10 +264,7 @@ def main():
             log.warning("检测到已有实例运行，通过已存在实例激活窗口")
             # 尝试激活已有窗口（通过窗口标题定位），用 SW_RESTORE 避免重复创建
             try:
-                hwnd = ctypes.windll.user32.FindWindowW(None, _WINDOW_TITLE)
-                if hwnd:
-                    ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+                _activate_existing_instance()
             except Exception:
                 pass
             return
@@ -247,8 +292,7 @@ def main():
         close_behavior = db.get_setting("close_behavior", "minimize")
         if close_behavior == "exit":
             log.info("关闭行为设为「退出」，直接关闭窗口并退出")
-            _closing = True
-            on_tray_exit()
+            exit_app()
             return True
         # 默认：最小化到托盘。用真实 HWND 隐藏（SW_HIDE），避免 pywebview hide/show
         # 重建窗口导致 Windows 任务栏图标无限叠加。

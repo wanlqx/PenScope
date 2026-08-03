@@ -9,9 +9,6 @@
   var current = { view: "dashboard", param: null };
   var settings = { language: "zh", theme: "dark", font_size: "14", layout: "comfortable",
     fx_enabled: "1",
-    mouse_trail_enabled: "1", mouse_trail_style: "light", mouse_trail_opacity: "0.6",
-    mouse_trail_mode: "ribbon", mouse_trail_width: "3", mouse_trail_fade: "0.04", mouse_trail_glow: "0.6",
-    mouse_trail_particles: "12", mouse_trail_length: "8",
     bg_particles_enabled: "1", bg_particle_density: "1.0", panel_opacity: "0.9" };
   // 扫描详情自动刷新状态（用户可控）。仅在用户停留在扫描详情且扫描活跃时刷新；
   // 一旦切换视图即被 router() 中的 clearScanTimer() 取消，确保不会被强制拉回扫描界面。
@@ -841,8 +838,17 @@
     if (settings.fx_enabled !== "0") {
       initBgFx();
       initBtnGlow();
-      initMouseTrail();
     }
+    // 应用内「退出」按钮：二次确认后请求后端干净退出（避免误关丢失进行中的扫描）
+    var exitBtn = document.getElementById("tb-exit");
+    if (exitBtn) exitBtn.addEventListener("click", function () {
+      confirmDialog(
+        settings.language === "en" ? "Exit PenScope?" : "退出 PenScope？",
+        settings.language === "en" ? "This will close the application completely; any running scans will be stopped."
+          : "将完全关闭应用程序，正在进行的扫描会被终止。",
+        function () { call("exit_app"); }
+      );
+    });
   }
 
   // 视觉效果主开关：根据 settings.fx_enabled 切换 body.fx-off，
@@ -976,7 +982,7 @@
   // —— 自定义光标跟随（参考 vulnclaw.com 红点 + 轮廓）——
   function initBtnGlow() {
     if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    // 按钮光晕委托
+    // 按钮光晕委托（事件委托，零逐元素绑定）
     document.addEventListener("mousemove", function (e) {
       var el = e.target;
       if (!el || !el.closest) return;
@@ -986,232 +992,6 @@
       btn.style.setProperty("--mx", (e.clientX - r.left) + "px");
       btn.style.setProperty("--my", (e.clientY - r.top) + "px");
     }, { passive: true });
-    // 自定义光标跟随（红点 + 轮廓，仅桌面端）
-    if (window.matchMedia("(pointer:fine)").matches) {
-      var dot = document.getElementById("cursor-dot");
-      var out = document.getElementById("cursor-outline");
-      if (!dot || !out) return;
-      document.addEventListener("mousemove", function (e) {
-        dot.style.left = e.clientX + "px";
-        dot.style.top = e.clientY + "px";
-        out.style.left = e.clientX + "px";
-        out.style.top = e.clientY + "px";
-        // 悬停可交互元素时放大轮廓
-        var t = e.target;
-        var isClickable = t && (t.closest("a,button,input,select,textarea,[role=button],.nav-item,.btn,.tb-bell,.tb-btn") != null);
-        if (isClickable) {
-          dot.style.width = "12px"; dot.style.height = "12px";
-          out.style.width = "48px"; out.style.height = "48px";
-          out.style.borderColor = "rgba(255,59,92,.6)";
-          out.style.background = "rgba(255,59,92,.06)";
-        } else {
-          dot.style.width = "8px"; dot.style.height = "8px";
-          out.style.width = "36px"; out.style.height = "36px";
-          out.style.borderColor = "rgba(255,59,92,.4)";
-          out.style.background = "transparent";
-        }
-      }, { passive: true });
-    }
-  }
-
-  // —— 淡色系鼠标拖尾特效（原创设计，canvas 实现，支持设置面板自定义）——
-  var _mouseTrail = { points: [], particles: [], running: false, raf: null };
-  // 淡色系调色板（原创设计）：青/紫/粉/蓝 + 极光
-  var TRAIL_COLORS = {
-    light: [[34, 211, 238], [139, 92, 246], [255, 182, 193], [147, 197, 253]],
-    warm:  [[255, 182, 193], [255, 218, 185], [255, 204, 188], [255, 160, 140]],
-    cool:  [[147, 197, 253], [187, 222, 251], [167, 139, 250], [120, 170, 255]],
-    mono:  [[200, 210, 220], [180, 190, 200], [160, 170, 185]],
-    aurora:[[52, 211, 153], [34, 211, 238], [139, 92, 246], [244, 114, 182]]
-  };
-  function _trailOpts() {
-    return {
-      enabled: settings.mouse_trail_enabled !== "0",
-      style: settings.mouse_trail_style || "light",
-      mode: settings.mouse_trail_mode || "ribbon",
-      opacity: parseFloat(settings.mouse_trail_opacity || "0.6"),
-      width: parseFloat(settings.mouse_trail_width || "3"),
-      length: parseInt(settings.mouse_trail_length || "8", 10),
-      fade: parseFloat(settings.mouse_trail_fade || "0.04"),
-      glow: parseFloat(settings.mouse_trail_glow || "0.6"),
-      particles: parseInt(settings.mouse_trail_particles || "12", 10)
-    };
-  }
-  function initMouseTrail() {
-    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    if (settings.mouse_trail_enabled === "0") return;
-    if (window.matchMedia("(pointer:coarse)").matches) return; // 触屏设备跳过
-
-    // 创建拖尾 canvas（位于所有面板之上、指针之下）
-    var canvas = document.createElement("canvas");
-    canvas.id = "mouse-trail-canvas";
-    canvas.setAttribute("aria-hidden", "true");
-    canvas.style.cssText = "position:fixed;inset:0;z-index:9995;pointer-events:none";
-    document.body.appendChild(canvas);
-
-    var ctx = canvas.getContext("2d");
-    if (!ctx) { canvas.remove(); return; }
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var w = 0, h = 0, _tick = 0;
-
-    function resize() {
-      w = window.innerWidth; h = window.innerHeight;
-      canvas.width = w * dpr; canvas.height = h * dpr;
-      canvas.style.width = w + "px"; canvas.style.height = h + "px";
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-
-    function addSpark(x, y, o) {
-      var pal = TRAIL_COLORS[o.style] || TRAIL_COLORS.light;
-      var c = pal[Math.floor(Math.random() * pal.length)];
-      _mouseTrail.particles.push({
-        x: x + (Math.random() - 0.5) * 8, y: y + (Math.random() - 0.5) * 8,
-        vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.5) * 0.9 - 0.2,
-        life: 1, decay: o.fade * 0.6 + Math.random() * 0.02,
-        r: Math.random() * 3 + 1.5, c: c, phase: Math.random() * Math.PI * 2
-      });
-      while (_mouseTrail.particles.length > o.particles * 4) _mouseTrail.particles.shift();
-    }
-
-    var _lastSpark = 0;
-    document.addEventListener("mousemove", function (e) {
-      var o = _trailOpts();
-      // 记录鼠标轨迹点（用于丝带/彗尾的平滑插值）
-      _mouseTrail.points.push({ x: e.clientX, y: e.clientY });
-      while (_mouseTrail.points.length > o.length + 4) _mouseTrail.points.shift();
-      if (o.mode === "spark") {
-        var now = Date.now();
-        if (now - _lastSpark > 24) {
-          _lastSpark = now;
-          var n = Math.max(1, Math.floor(o.particles / 6));
-          for (var i = 0; i < n; i++) addSpark(e.clientX, e.clientY, o);
-        }
-      }
-    }, { passive: true });
-
-    function step() {
-      if (!_mouseTrail.running) return;
-      _tick++;
-      var o = _trailOpts();
-      ctx.clearRect(0, 0, w, h);
-      var pts = _mouseTrail.points;
-      // —— 丝带 / 彗尾：基于轨迹点的平滑发光描边（头亮尾淡、头粗尾细）——
-      if (o.mode !== "spark" && pts.length >= 2) {
-        var pal = TRAIL_COLORS[o.style] || TRAIL_COLORS.light;
-        var n = pts.length;
-        ctx.lineCap = "round"; ctx.lineJoin = "round";
-        for (var k = 1; k < n; k++) {
-          var p0 = pts[k - 1], p1 = pts[k];
-          var f = k / n;                                  // 0(尾) → 1(头)
-          var alpha = Math.pow(f, 1.4) * o.opacity;       // 自然衰减
-          var c = pal[k % pal.length];
-          ctx.strokeStyle = "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + alpha + ")";
-          ctx.lineWidth = o.width * (0.35 + f * 0.65);
-          ctx.shadowColor = "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (alpha * o.glow) + ")";
-          ctx.shadowBlur = o.glow * 12 * f;
-          ctx.beginPath();
-          ctx.moveTo(p0.x, p0.y);
-          var mx = (p0.x + p1.x) / 2, my = (p0.y + p1.y) / 2;
-          ctx.quadraticCurveTo(p0.x, p0.y, mx, my);       // 二次曲线平滑
-          ctx.stroke();
-        }
-        ctx.shadowBlur = 0;
-        // 彗尾模式：头部光晕
-        if (o.mode === "comet") {
-          var head = pts[n - 1], hc = pal[(n - 1) % pal.length];
-          var hr = o.width * 2.4;
-          var g = ctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, hr * 2.2);
-          g.addColorStop(0, "rgba(" + hc[0] + "," + hc[1] + "," + hc[2] + "," + o.opacity + ")");
-          g.addColorStop(1, "rgba(" + hc[0] + "," + hc[1] + "," + hc[2] + ",0)");
-          ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(head.x, head.y, hr * 2.2, 0, Math.PI * 2); ctx.fill();
-        }
-      }
-      // —— 粒子（星火模式，或作为点缀）——
-      var m = _mouseTrail.particles.length;
-      for (var i = m - 1; i >= 0; i--) {
-        var p = _mouseTrail.particles[i];
-        p.x += p.vx; p.y += p.vy; p.vy += 0.015;
-        p.vx += Math.sin(_tick * 0.03 + p.phase) * 0.04;
-        p.life -= p.decay;
-        if (p.life <= 0) { _mouseTrail.particles.splice(i, 1); continue; }
-        var a = p.life * o.opacity * 0.8;
-        ctx.shadowColor = "rgba(" + p.c[0] + "," + p.c[1] + "," + p.c[2] + "," + (a * o.glow) + ")";
-        ctx.shadowBlur = p.r * 2.2 * o.glow;
-        ctx.fillStyle = "rgba(" + p.c[0] + "," + p.c[1] + "," + p.c[2] + "," + a + ")";
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (0.4 + p.life * 0.6), 0, Math.PI * 2); ctx.fill();
-      }
-      ctx.shadowBlur = 0;
-      // 静止时拖尾自然缩短（按消散速度淡出最旧点）
-      if (pts.length > 2 && Math.random() < o.fade * 2) pts.shift();
-      _mouseTrail.raf = requestAnimationFrame(step);
-    }
-
-    function start() { if (!_mouseTrail.running) { _mouseTrail.running = true; step(); } }
-    function stop() { _mouseTrail.running = false; if (_mouseTrail.raf) { cancelAnimationFrame(_mouseTrail.raf); _mouseTrail.raf = null; } }
-
-    resize();
-    window.addEventListener("resize", resize);
-    document.addEventListener("visibilitychange", function () {
-      if (document.hidden) stop(); else start();
-    });
-    start();
-  }
-
-  // 设置面板实时预览：在小 canvas 上用当前参数绘制模拟拖尾（canvas 脱离 DOM 时自动停止）
-  function previewTrail(canvas) {
-    if (!canvas) return null;
-    var pctx = canvas.getContext("2d");
-    var pdpr = Math.min(window.devicePixelRatio || 1, 2);
-    var pw = 0, ph = 0, raf = null, alive = true;
-    function presize() { pw = canvas.clientWidth || 260; ph = canvas.clientHeight || 96; canvas.width = pw * pdpr; canvas.height = ph * pdpr; pctx.setTransform(pdpr, 0, 0, pdpr, 0, 0); }
-    presize();
-    var _t = 0;
-    function draw() {
-      if (!alive || !canvas.isConnected) { alive = false; return; }
-      _t++;
-      var o = _trailOpts();
-      pctx.clearRect(0, 0, pw, ph);
-      var cnt = o.length + 4, pts = [];
-      for (var i = 0; i < cnt; i++) {
-        var tt = _t * 0.05 - (cnt - i) * 0.25;
-        pts.push({ x: pw * 0.5 + Math.sin(tt) * pw * 0.32, y: ph * 0.5 + Math.cos(tt * 1.3) * ph * 0.28 });
-      }
-      var pal = TRAIL_COLORS[o.style] || TRAIL_COLORS.light;
-      if (o.mode !== "spark") {
-        pctx.lineCap = "round"; pctx.lineJoin = "round";
-        for (var k = 1; k < pts.length; k++) {
-          var f = k / pts.length, c = pal[k % pal.length], a = Math.pow(f, 1.4) * o.opacity;
-          pctx.strokeStyle = "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + a + ")";
-          pctx.lineWidth = o.width * (0.35 + f * 0.65);
-          pctx.shadowColor = "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (a * o.glow) + ")";
-          pctx.shadowBlur = o.glow * 12 * f;
-          pctx.beginPath(); pctx.moveTo(pts[k - 1].x, pts[k - 1].y);
-          pctx.quadraticCurveTo(pts[k - 1].x, pts[k - 1].y, (pts[k - 1].x + pts[k].x) / 2, (pts[k - 1].y + pts[k].y) / 2);
-          pctx.stroke();
-        }
-        pctx.shadowBlur = 0;
-        if (o.mode === "comet") {
-          var head = pts[pts.length - 1], hc = pal[(pts.length - 1) % pal.length];
-          var g = pctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, o.width * 4);
-          g.addColorStop(0, "rgba(" + hc[0] + "," + hc[1] + "," + hc[2] + "," + o.opacity + ")");
-          g.addColorStop(1, "rgba(" + hc[0] + "," + hc[1] + "," + hc[2] + ",0)");
-          pctx.fillStyle = g; pctx.beginPath(); pctx.arc(head.x, head.y, o.width * 4, 0, Math.PI * 2); pctx.fill();
-        }
-      } else {
-        for (var s = 0; s < pts.length; s += 2) {
-          var c2 = pal[s % pal.length], a2 = Math.pow(s / pts.length, 1.2) * o.opacity;
-          pctx.shadowColor = "rgba(" + c2[0] + "," + c2[1] + "," + c2[2] + "," + (a2 * o.glow) + ")";
-          pctx.shadowBlur = o.glow * 10;
-          pctx.fillStyle = "rgba(" + c2[0] + "," + c2[1] + "," + c2[2] + "," + a2 + ")";
-          pctx.beginPath(); pctx.arc(pts[s].x, pts[s].y, o.width * 0.8, 0, Math.PI * 2); pctx.fill();
-        }
-        pctx.shadowBlur = 0;
-      }
-      raf = requestAnimationFrame(draw);
-    }
-    draw();
-    return { stop: function () { alive = false; if (raf) cancelAnimationFrame(raf); } };
   }
 
   // —— 面板透明度应用 ——
@@ -2409,7 +2189,6 @@
           '<span id="font-val" style="margin-left:8px;min-width:24px">' + settings.font_size + 'px</span></div>' +
         '<div class="setting-row"><label>' + t("layout") + '</label>' +
           '<select id="set-layout"><option value="comfortable" ' + (settings.layout === "comfortable" ? "selected" : "") + '>' + t("comfortable") + '</option>' +
-          '<option value="compact" ' + (settings.layout === "compact" ? "selected" : "") + '>' + t("compact") + '</option>' +
           '<option value="card" ' + (settings.layout === "card" ? "selected" : "") + '>' + t("card") + '</option></select></div>' +
         '<div class="setting-row"><label>' + t("reportTemplate") + '</label>' +
           '<select id="set-tpl"><option value="summary" ' + (settings.report_template === "summary" ? "selected" : "") + '>' + t("tplSummary") + '</option>' +
@@ -2424,40 +2203,7 @@
         '<div class="card settings-group"><h3>' + (settings.language === "en" ? "Visual Effects" : "视觉效果") + '</h3>' +
         '<div class="setting-row"><label>' + (settings.language === "en" ? "Enable visual effects" : "启用视觉效果") + '</label>' +
           '<input type="checkbox" id="set-fx" ' + (settings.fx_enabled === "1" ? "checked" : "") + '></div>' +
-        '<p class="muted" style="margin:0">' + (settings.language === "en" ? "Master switch for all dynamic/static visual effects (mouse trail, custom cursor, background particles, scanlines, vignette, noise, button glow). Turn off for a plain native look." : "统一控制所有动态/静态视觉效果（鼠标拖尾、自定义光标、背景粒子、扫描线、暗角、噪点、按钮光晕）的总开关。关闭后恢复系统原生简洁外观。") + '</p></div>' +
-        '<div class="card settings-group"><h3>' + (settings.language === "en" ? "Mouse Effects" : "鼠标特效") + '</h3>' +
-        '<div class="setting-row"><label>' + (settings.language === "en" ? "Mouse trail" : "鼠标拖尾") + '</label>' +
-          '<input type="checkbox" id="set-mousetrail" ' + (settings.mouse_trail_enabled === "1" ? "checked" : "") + '></div>' +
-        '<div class="setting-row"><label>' + (settings.language === "en" ? "Trail mode" : "拖尾模式") + '</label>' +
-          '<select id="set-trailmode"><option value="ribbon" ' + (settings.mouse_trail_mode === "ribbon" ? "selected" : "") + '>' + (settings.language === "en" ? "Ribbon" : "丝带") + '</option>' +
-          '<option value="comet" ' + (settings.mouse_trail_mode === "comet" ? "selected" : "") + '>' + (settings.language === "en" ? "Comet" : "彗尾") + '</option>' +
-          '<option value="spark" ' + (settings.mouse_trail_mode === "spark" ? "selected" : "") + '>' + (settings.language === "en" ? "Spark" : "星火") + '</option></select></div>' +
-        '<div class="setting-row"><label>' + (settings.language === "en" ? "Trail style" : "色彩风格") + '</label>' +
-          '<select id="set-trailstyle"><option value="light" ' + (settings.mouse_trail_style === "light" ? "selected" : "") + '>' + (settings.language === "en" ? "Light pastel" : "淡彩") + '</option>' +
-          '<option value="warm" ' + (settings.mouse_trail_style === "warm" ? "selected" : "") + '>' + (settings.language === "en" ? "Warm" : "暖色") + '</option>' +
-          '<option value="cool" ' + (settings.mouse_trail_style === "cool" ? "selected" : "") + '>' + (settings.language === "en" ? "Cool" : "冷色") + '</option>' +
-          '<option value="mono" ' + (settings.mouse_trail_style === "mono" ? "selected" : "") + '>' + (settings.language === "en" ? "Monochrome" : "单色") + '</option>' +
-          '<option value="aurora" ' + (settings.mouse_trail_style === "aurora" ? "selected" : "") + '>' + (settings.language === "en" ? "Aurora" : "极光") + '</option></select></div>' +
-        '<div class="setting-row"><label>' + (settings.language === "en" ? "Opacity" : "透明度") + '</label>' +
-          '<input type="range" id="set-trailopacity" min="0.1" max="1" step="0.05" value="' + settings.mouse_trail_opacity + '">' +
-          '<span id="trailopacity-val" style="margin-left:8px;min-width:28px">' + settings.mouse_trail_opacity + '</span></div>' +
-        '<div class="setting-row"><label>' + (settings.language === "en" ? "Trail width" : "线条粗细") + '</label>' +
-          '<input type="range" id="set-trailwidth" min="1" max="8" step="0.5" value="' + settings.mouse_trail_width + '">' +
-          '<span id="trailwidth-val" style="margin-left:8px;min-width:28px">' + settings.mouse_trail_width + '</span></div>' +
-        '<div class="setting-row"><label>' + (settings.language === "en" ? "Trail length" : "拖尾长度") + '</label>' +
-          '<input type="range" id="set-traillength" min="3" max="30" step="1" value="' + settings.mouse_trail_length + '">' +
-          '<span id="traillength-val" style="margin-left:8px;min-width:28px">' + settings.mouse_trail_length + '</span></div>' +
-        '<div class="setting-row"><label>' + (settings.language === "en" ? "Fade speed" : "消散速度") + '</label>' +
-          '<input type="range" id="set-trailfade" min="0.01" max="0.1" step="0.01" value="' + settings.mouse_trail_fade + '">' +
-          '<span id="trailfade-val" style="margin-left:8px;min-width:28px">' + settings.mouse_trail_fade + '</span></div>' +
-        '<div class="setting-row"><label>' + (settings.language === "en" ? "Glow" : "辉光强度") + '</label>' +
-          '<input type="range" id="set-trailglow" min="0" max="1" step="0.05" value="' + settings.mouse_trail_glow + '">' +
-          '<span id="trailglow-val" style="margin-left:8px;min-width:28px">' + settings.mouse_trail_glow + '</span></div>' +
-        '<div class="setting-row"><label>' + (settings.language === "en" ? "Spark density" : "星火密度") + '</label>' +
-          '<input type="range" id="set-trailparticles" min="0" max="40" step="1" value="' + settings.mouse_trail_particles + '">' +
-          '<span id="trailparticles-val" style="margin-left:8px;min-width:28px">' + settings.mouse_trail_particles + '</span></div>' +
-        '<canvas id="trail-preview" class="trail-preview" aria-hidden="true"></canvas>' +
-        '<p class="muted" style="margin:6px 0 0">' + (settings.language === "en" ? "Live preview updates as you adjust. Full effect applies after reload." : "实时预览随调节更新，完整效果保存刷新后生效。") + '</p></div>' +
+        '<p class="muted" style="margin:0">' + (settings.language === "en" ? "Master switch for all dynamic/static visual effects (background particles, scanlines, vignette, noise, button glow). Turn off for a plain native look." : "统一控制所有动态/静态视觉效果（背景粒子、扫描线、暗角、噪点、按钮光晕）的总开关。关闭后恢复系统原生简洁外观。") + '</p></div>' +
         '<div class="card settings-group"><h3>' + (settings.language === "en" ? "Panel Transparency" : "面板透明度") + '</h3>' +
         '<div class="setting-row"><label>' + (settings.language === "en" ? "Panel opacity" : "面板不透明度") + '</label>' +
           '<input type="range" id="set-panelopacity" min="0.35" max="1" step="0.05" value="' + settings.panel_opacity + '">' +
@@ -2524,17 +2270,7 @@
         var el = document.getElementById(id);
         if (el) el.addEventListener("change", function () { settings[key] = el.value; });
       }
-      liveRange("set-trailopacity", "mouse_trail_opacity", "trailopacity-val", null);
-      liveRange("set-trailwidth", "mouse_trail_width", "trailwidth-val", null);
-      liveRange("set-traillength", "mouse_trail_length", "traillength-val", null);
-      liveRange("set-trailfade", "mouse_trail_fade", "trailfade-val", null);
-      liveRange("set-trailglow", "mouse_trail_glow", "trailglow-val", null);
-      liveRange("set-trailparticles", "mouse_trail_particles", "trailparticles-val", null);
       liveRange("set-bgdensity", "bg_particle_density", "bgdensity-val", null);
-      liveSelect("set-trailmode", "mouse_trail_mode");
-      liveSelect("set-trailstyle", "mouse_trail_style");
-      var mtChk = document.getElementById("set-mousetrail");
-      if (mtChk) mtChk.addEventListener("change", function () { settings.mouse_trail_enabled = mtChk.checked ? "1" : "0"; });
       var bgChk = document.getElementById("set-bgparticles");
       if (bgChk) bgChk.addEventListener("change", function () { settings.bg_particles_enabled = bgChk.checked ? "1" : "0"; });
       var fxChk = document.getElementById("set-fx");
@@ -2543,8 +2279,6 @@
         applyFxClass();  // 立即反馈：静态层（扫描线/暗角/噪点/自定义光标）实时开关；动态层（粒子/拖尾）保存刷新后生效
       });
       // 实时预览（canvas 脱离 DOM 时自动停止，避免泄漏）
-      var pv = document.getElementById("trail-preview");
-      if (pv) previewTrail(pv);
       var panelOp = document.getElementById("set-panelopacity");
       if (panelOp) panelOp.addEventListener("input", function (e) {
         document.getElementById("panelopacity-val").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
@@ -2568,15 +2302,6 @@
         settings.layout = document.getElementById("set-layout").value;
         settings.report_template = document.getElementById("set-tpl").value;
         settings.close_behavior = document.getElementById("set-closebehavior").value;
-        settings.mouse_trail_enabled = document.getElementById("set-mousetrail").checked ? "1" : "0";
-        settings.mouse_trail_mode = document.getElementById("set-trailmode").value;
-        settings.mouse_trail_style = document.getElementById("set-trailstyle").value;
-        settings.mouse_trail_opacity = document.getElementById("set-trailopacity").value;
-        settings.mouse_trail_width = document.getElementById("set-trailwidth").value;
-        settings.mouse_trail_length = document.getElementById("set-traillength").value;
-        settings.mouse_trail_fade = document.getElementById("set-trailfade").value;
-        settings.mouse_trail_glow = document.getElementById("set-trailglow").value;
-        settings.mouse_trail_particles = document.getElementById("set-trailparticles").value;
         settings.bg_particles_enabled = document.getElementById("set-bgparticles").checked ? "1" : "0";
         settings.bg_particle_density = document.getElementById("set-bgdensity").value;
         settings.panel_opacity = document.getElementById("set-panelopacity").value;
@@ -3034,9 +2759,33 @@
   // ---------------- 自动刷新（只读视图） ----------------
   // 注意：刻意排除 "scan" —— 扫描详情的轮询由上面专门的、可取消的 _scanTimer 负责，
   // 全局轮询只刷新仪表盘 / 扫描列表 / 复核队列的数据，绝不主动"进入"扫描界面。
-  setInterval(function () {
-    if (["dashboard", "scans", "reviews"].indexOf(current.view) >= 0) router();
-  }, 5000);
+  // 自动刷新（只读视图）：仅当数据真正变化时才重渲染当前视图。
+  // 直接每 5s 整体重绘会导致仪表盘（尤其资产拓扑预览）周期性闪动，故先比对数据签名，
+  // 未变化则跳过整页重渲染；活跃扫描期间数据变化仍会刷新（属预期更新）。
+  var _lastRefreshSig = undefined;  // undefined = 尚未建立基线（导航已渲染，首拍仅建基线不重绘）
+  function _autoRefresh() {
+    if (["dashboard", "scans", "reviews"].indexOf(current.view) < 0) return;
+    var p;
+    if (current.view === "dashboard") p = Promise.all([call("list_targets"), call("list_scans", 20), call("list_reviews")]);
+    else if (current.view === "scans") p = call("list_scans", 100);
+    else p = call("list_reviews");
+    p.then(function (res) {
+      var sig;
+      if (current.view === "dashboard")
+        sig = res[0].map(function (x) { return x.id + ":" + (x.status || ""); }).join(",") + "|" +
+              res[1].map(function (x) { return x.id + ":" + (x.status || "") + ":" + (x.stage || ""); }).join(",") + "|" +
+              res[2].map(function (x) { return x.id + ":" + (x.kind || ""); }).join(",");
+      else if (current.view === "scans")
+        sig = res.map(function (x) { return x.id + ":" + (x.status || "") + ":" + (x.stage || ""); }).join(",");
+      else
+        sig = res.map(function (x) { return x.id + ":" + (x.kind || ""); }).join(",");
+      if (_lastRefreshSig === undefined) { _lastRefreshSig = sig; return; }  // 首拍仅建基线
+      if (sig === _lastRefreshSig) return;  // 未变化：跳过整页重渲染，杜绝拓扑预览闪动
+      _lastRefreshSig = sig;
+      router();
+    }).catch(function () {});
+  }
+  setInterval(_autoRefresh, 5000);
 
   // ---------------- 首次使用向导（U-01） ----------------
   function renderWizard() {

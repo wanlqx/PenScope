@@ -637,9 +637,6 @@ class Api:
                     "enable_session_renew": "0",
                     "close_behavior": "minimize",
                     "fx_enabled": "1",
-                    "mouse_trail_enabled": "1", "mouse_trail_style": "light", "mouse_trail_opacity": "0.6",
-                    "mouse_trail_mode": "ribbon", "mouse_trail_width": "3", "mouse_trail_fade": "0.04",
-                    "mouse_trail_glow": "0.6", "mouse_trail_particles": "12", "mouse_trail_length": "8",
                     "bg_particles_enabled": "1", "bg_particle_density": "1.0",
                     "panel_opacity": "0.9"}
         result = dict(defaults)
@@ -648,6 +645,19 @@ class Api:
             if v is not None:
                 result[k] = v
         return _ok(result)
+
+    def exit_app(self):
+        """应用内「退出」按钮：干净地终止整个进程（停托盘 + 销毁窗口 + os._exit）。
+
+        实现委托给 main_gui.exit_app，避免与窗口/托盘生命周期耦合；若导入失败则直接强退。
+        """
+        try:
+            import main_gui
+            main_gui.exit_app()
+        except Exception:
+            import os
+            os._exit(0)
+        return {"ok": True}
 
     def set_settings(self, settings):
         """保存用户设置；settings 为 dict。键白名单 + 值校验（font_size 必须为 12-20 整数）。
@@ -661,9 +671,6 @@ class Api:
                    "asset_change_alert", "asset_change_notify", "asset_autoscan",
                    "enable_session_renew",
                    "close_behavior", "fx_enabled",
-                   "mouse_trail_enabled", "mouse_trail_style", "mouse_trail_opacity",
-                   "mouse_trail_mode", "mouse_trail_width", "mouse_trail_fade", "mouse_trail_glow",
-                   "mouse_trail_particles", "mouse_trail_length",
                    "bg_particles_enabled", "bg_particle_density",
                    "panel_opacity"}
         clean = {}

@@ -52,22 +52,10 @@ body{margin:0;background:var(--bg);color:var(--text);
 .noise{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9996;
   opacity:0.018;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='nf'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23nf)'/%3E%3C/svg%3E")}
 
-/* ◎ 自定义光标（红点 + 轮廓，参考 vulnclaw.com）*/
-.cursor-dot{width:8px;height:8px;background:var(--danger);border-radius:50%;position:fixed;
-  pointer-events:none;z-index:10000;transform:translate(-50%,-50%);
-  transition:width .15s,height .15s,background .15s;
-  box-shadow:0 0 10px var(--danger),0 0 20px var(--danger);display:none}
-.cursor-outline{width:36px;height:36px;border:1px solid rgba(255,59,92,.4);border-radius:50%;
-  position:fixed;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);
-  transition:width .2s,height .2s,border-color .2s;display:none}
-body:hover .cursor-dot,body:hover .cursor-outline{display:block}
-@media (pointer:coarse){.cursor-dot,.cursor-outline{display:none!important}}
 /* —— 视觉效果主开关（设置项 fx_enabled 关闭时生效）：隐藏所有动态/静态装饰层 —— */
 body.fx-off .scanlines,
 body.fx-off .vignette,
-body.fx-off .noise,
-body.fx-off .cursor-dot,
-body.fx-off .cursor-outline{display:none!important}
+body.fx-off .noise{display:none!important}
 body.fx-off .btn-glow::before{display:none!important}
 .mono{font-family:var(--f-mono);font-size:12px}
 a{color:var(--accent);text-decoration:none}
@@ -84,12 +72,10 @@ a:hover{text-decoration:underline}
   font-size:10px;color:var(--text-faint);flex:none;letter-spacing:.5px}
 main{padding:calc(14px + var(--topbar-h)) 20px calc(16px + var(--statusbar-h));margin-left:48px;
   position:relative;z-index:1;height:100vh;overflow:auto;overflow-anchor:none;scroll-behavior:auto}
-:root[data-layout="compact"] main{padding:calc(10px + var(--topbar-h)) 14px calc(12px + var(--statusbar-h))}
 h1{font-size:22px;margin:0 0 6px}h2{font-size:17px;margin:24px 0 12px}
 .flash{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:16px;color:var(--warn)}
 .pill{background:var(--danger);color:#fff;border-radius:10px;padding:0 7px;font-size:11px;margin-left:6px}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px;transition:background .2s}
-.trail-preview{display:block;width:100%;height:96px;margin:10px 0 2px;border:1px solid var(--border);border-radius:10px;background:rgba(8,11,16,.55)}
 .grid{display:grid;gap:14px}
 .stats{display:flex;gap:12px;flex-wrap:wrap}
 .stat{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 18px;text-align:center;min-width:90px}
@@ -162,9 +148,6 @@ details.authcfg textarea{min-height:54px}
 .form-row input,.form-row select,.form-row textarea{width:100%}
 
 /* 布局变体 */
-:root[data-layout="compact"] main{padding:16px 20px;max-width:100%}
-:root[data-layout="compact"] .card{padding:12px;margin-bottom:10px}
-:root[data-layout="compact"] h1{font-size:18px}
 :root[data-layout="card"] main{max-width:1400px}
 :root[data-layout="card"] .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 
@@ -181,7 +164,6 @@ details.authcfg textarea{min-height:54px}
 [data-theme="light"] .report-frame{background:#fff}
 [data-theme="light"] .nav-item{font-weight:500}            /* 图标加粗，浅色下更清晰 */
 [data-theme="light"] .side-foot{color:var(--text-faint)}  /* 底部版本号同样加深 */
-[data-theme="light"] .trail-preview{background:rgba(0,0,0,.05)}  /* 原为深色半透明，浅色下改浅 */
 [data-theme="light"] .vignette{background:radial-gradient(ellipse at center, transparent 0%, transparent 60%, rgba(0,0,0,.12) 100%)}  /* 降低暗角强度 */
 [data-theme="light"] .modal-foot{background:var(--panel2)}  /* 原引用未定义的 --card，修正为面板色 */
 
