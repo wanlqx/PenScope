@@ -16,10 +16,12 @@
 正文相似度排除）。初版宁漏不夸。
 """
 import re
+from urllib.parse import parse_qs, urlparse, urlunparse
+
 import requests
-from urllib.parse import urlparse, urlunparse, parse_qs
-from scanner.web_scan import discover, _mk
+
 from cvss_dedup import cwe_for
+from scanner.web_scan import _mk, discover
 
 _UA = "PenScope/1.0 (authorized security test)"
 

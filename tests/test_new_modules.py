@@ -16,15 +16,15 @@ if os.path.exists(_TEST_DB):
 os.environ["AUTOPENTEST_DB"] = _TEST_DB
 
 import vuln_demo2
+
 import db
-import run_scans
 import reports
+import run_scans
 
 
 def main():
     port = 18099
     srv = vuln_demo2.start(port)
-    base = f"http://127.0.0.1:{port}"
     time.sleep(0.5)
 
     db.init_db()

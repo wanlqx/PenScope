@@ -1,9 +1,21 @@
 """构建包装：恢复 os.remove/unlink/rmdir 为原生 nt.* 实现，绕过本机 safe-delete 沙箱封装，
 仅在本次本地构建中使用。不改动项目源码与 shim。
+
+⚠️ 平台限制：本脚本直接使用 Windows 原生模块 `nt`（nt.unlink / nt.rmdir），因此**仅能在
+Windows 上运行**。在 Linux / macOS 上 `import nt` 会直接抛 ImportError。CI 的构建任务已固定
+使用 `windows-latest` runner；本地构建也必须在 Windows 下进行（见 CONTRIBUTING.md）。
 """
+import sys
+
+if sys.platform != "win32":
+    sys.stderr.write(
+        "build_nowrap.py 仅支持 Windows（依赖 nt 模块）。请在 Windows 环境或 windows-latest "
+        "runner 上执行构建。\n"
+    )
+    sys.exit(2)
+
 import nt
 import os
-import sys
 
 # 沙箱 shim 把 os.remove/os.unlink/os.rmdir 替换为拦截版本；
 # 这里在【本次构建进程内、且仅在 PyInstaller 构建期】把它们还原为底层原生实现，

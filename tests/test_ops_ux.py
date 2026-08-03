@@ -5,7 +5,6 @@
 
 import os
 import tempfile
-import json
 
 import db as dbmod
 import scanner.redact as redact

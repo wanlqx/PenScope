@@ -17,12 +17,12 @@
 
 所有载荷均不含破坏性指令；不读取、不外传任何业务数据。
 """
-import re
 import random
+
 import requests
-from scanner.web_scan import _send_form, discover, _mk
-from scanner.payloads import PayloadGenerator, detect_waf
+
 from cvss_dedup import cwe_for
+from scanner.web_scan import _mk, _send_form, discover
 
 _MARKER_PREFIX = "APCMD"
 
@@ -64,7 +64,7 @@ def scan_cmd(url, session, pg, timeout=6.0, verify_ssl=True):
     for f in forms:
         for field in [n for n in f["fields"] if n not in f["file_fields"]]:
             test_points.append((f["action"], f["method"], field, f["fields"]))
-    from urllib.parse import urlparse, urlunparse, parse_qs
+    from urllib.parse import parse_qs, urlparse, urlunparse
     q = urlparse(url)
     base = urlunparse(q._replace(query="", fragment=""))
     for k in parse_qs(q.query).keys():

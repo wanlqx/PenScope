@@ -60,8 +60,9 @@ PenScope 是一款面向安全测试人员 / 授权渗透测试场景的桌面�
 > 数据（扫描库 `autopentest.db`）保存在 exe 同级目录，卸载时删除该目录即可。
 
 ### 方式二：从源码运行（开发者）
+要求：Python **3.11+**（GUI 推荐 Windows + [WebView2 运行时](https://developer.microsoft.com/zh-cn/microsoft-edge/webview2/)）。
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-lock.txt || pip install -r requirements.txt   # 优先锁文件，保证可复现
 python main_gui.py
 ```
 
@@ -107,10 +108,17 @@ python build_nowrap.py        # 按 PenScope.spec 用 PyInstaller 构建，并�
 ```
 产物：`dist/PenScope.exe`（单文件、隐藏终端、内置原生界面 + 系统托盘）。
 
+> **打包环境要求（重要）**：构建**必须在 Windows 上进行**（PyInstaller 单文件 + WebView2 原生界面），CI 的发布流程也使用 `windows-latest` runner。
+> `build_nowrap.py` 在**本次构建进程内、且仅在 PyInstaller 构建期**会临时把 `os.remove / unlink / rmdir` 还原为 Windows 底层 `nt.*` 实现，以绕过本机 safe-delete 沙箱封装，使构建清理步骤能删除临时文件；**构建结束后立即还原**，不污染其它逻辑，也不在打包产物中留后门。请勿在非 Windows 或非受信环境运行该脚本。详见 [SECURITY.md](SECURITY.md) 与 `build_nowrap.py` 头部注释。
+
 ### 运行测试
 ```bash
 pip install pytest
 python -m pytest              # 运行 tests/ 下全部单元测试
+# CI 默认仅运行「无需显示/网络」的纯逻辑子集（跨 ubuntu + windows 双 runner）：
+python -m pytest tests/test_session_vault.py tests/test_hardening.py \
+    tests/test_cred_dict.py tests/smoke_nobackend.py \
+    tests/test_scope_redirect.py tests/test_vuln_i18n.py -q
 ```
 E2E 脚本（`tests/e2e_access_auth_dvwa.py` 等）需本地起受控目标或 DVWA，默认不随 `pytest` 自动执行。
 

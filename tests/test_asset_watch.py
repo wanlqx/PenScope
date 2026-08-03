@@ -3,17 +3,15 @@
 遵循项目约定：临时 DB 单测用 _tmp_db() 覆盖 config.DB_PATH / db.DB_PATH，finally 中 os.remove。
 """
 
-import io
-import json
 import os
 import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import asset_watch
 import config as cfg
 import db as dbmod
-import asset_watch
 
 
 def _tmp_db():

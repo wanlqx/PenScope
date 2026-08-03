@@ -2,13 +2,14 @@
 TCP 全连接扫描 + 服务指纹（banner 抓取）+ 已知漏洞版本比对。
 仅做连接与只读 banner 读取，不发送任何写/利用数据。
 """
-import socket
-import json
-import requests
-from scanner.vuln_db import match_vulns
-from scanner.scope import redirect_target_blocked
-
 import logging
+import socket
+
+import requests
+
+from scanner.scope import redirect_target_blocked
+from scanner.vuln_db import match_vulns
+
 log = logging.getLogger(__name__)
 
 # 端口 -> 常见服务名
@@ -32,9 +33,8 @@ def _grab_banner(sock, port, timeout):
     try:
         sock.settimeout(timeout)
         if port in HTTP_PORTS:
-            scheme = "https" if port in (443, 8443) else "http"
             # 仅做本地 socket 层 HEAD，避免引入额外依赖复杂度
-            req = f"HEAD / HTTP/1.0\r\nHost: x\r\n\r\n".encode()
+            req = "HEAD / HTTP/1.0\r\nHost: x\r\n\r\n".encode()
             sock.sendall(req)
             data = sock.recv(1024)
             return data.decode("utf-8", "ignore")

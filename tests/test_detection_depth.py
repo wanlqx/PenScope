@@ -7,6 +7,7 @@
 全部为纯函数测试，不依赖数据库 / 网络。
 """
 import pytest
+
 import scanner.baseline as baseline
 import scanner.payloads as payloads
 import scanner.vuln_db as vuln_db

@@ -8,10 +8,12 @@
      才判定，避免把"参数恰好回显输入"误判为 SSRF。
 """
 import re
+from urllib.parse import parse_qs, urlparse, urlunparse
+
 import requests
-from urllib.parse import urlparse, urlunparse, parse_qs
-from scanner.web_scan import discover, _send_form, _mk
+
 from cvss_dedup import cwe_for
+from scanner.web_scan import _mk, _send_form, discover
 
 # URL/file 类参数名（潜在 SSRF sink）
 _URL_PARAM_RE = re.compile(

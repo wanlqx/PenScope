@@ -2,8 +2,9 @@
 # 触发：推送到 master/main、针对 master/main 的 PR
 #
 # 门禁策略（见仓库改进路线图 P1 / 用户评审）：
-# - 测试（pytest）：必须通过（硬门禁），保证每次合并不破坏核心逻辑。
-# - 代码质量（ruff）/ 安全（bandit、pip-audit）：作为「告警」运行，不阻断 PR；
+# - 测试（pytest）：必须通过（硬门禁），保证每次合并不破坏核心逻辑。覆盖 ubuntu + windows 双 runner。
+# - 代码质量（ruff）：必须通过（硬门禁，移除 || true），让 CI 真正拦截风格 / 明显错误。
+# - 安全（bandit、pip-audit）：作为「告警」运行，不阻断 PR；
 #   安全扫描应提示风险而非阻断交付，按项目风险偏好后续可升级为必须。
 name: CI
 
@@ -19,7 +20,11 @@ permissions:
 jobs:
   test:
     name: 测试 (pytest)
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,12 +41,31 @@ jobs:
           pip install pytest
 
       - name: Run tests (required gate)
-        # 仅运行无需显示/网络的纯逻辑测试，保证 CI 稳定通过；
+        # 仅运行无需显示 / 网络的纯逻辑测试，保证 CI 稳定通过；
         # 其余涉及 GUI / 靶机的测试请在本机手动运行（见 CONTRIBUTING.md）。
         run: python -m pytest tests/test_session_vault.py tests/test_hardening.py tests/test_cred_dict.py tests/smoke_nobackend.py tests/test_scope_redirect.py tests/test_vuln_i18n.py -q
 
-  quality:
-    name: 代码质量与安全扫描 (warn)
+  lint:
+    name: 代码质量 (ruff, 必过)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: python -m pip install --upgrade pip && pip install ruff
+
+      # ruff 为硬门禁：发现错误 / 风格问题直接导致 CI 失败（不再 || true）。
+      - name: Ruff lint (required)
+        run: ruff check .
+
+  security:
+    name: 安全扫描 (warn, 不阻断)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -53,13 +77,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff bandit pip-audit
-
-      - name: Ruff lint (warn, non-blocking)
-        continue-on-error: true
-        run: ruff check .
+        run: python -m pip install --upgrade pip && pip install bandit pip-audit
 
       - name: Bandit security scan (warn, non-blocking)
         continue-on-error: true

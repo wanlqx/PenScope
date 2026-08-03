@@ -10,32 +10,63 @@
 - 利用验证 / 上传测试 两个高危阶段仍会暂停，等待使用者在界面点击"批准"才继续
   （复核闸门逻辑见 decide_review）。
 """
-import os
-import sys
-import json
-import platform
 import datetime
+import json
 import logging
+import os
+import platform
+import sys
 
 import config
+
 log = logging.getLogger(__name__)
 from db import (
-    init_db, list_targets, add_target, approve_target, reject_target,
-    get_target, create_scan, list_scans, get_scan, findings_of,
-    create_review, decide_review, pending_reviews, review_of,
-    list_schedules, create_schedule, update_schedule, audit, audit_tail,
-    update_scan, get_setting, set_setting, update_target, delete_target,
-    active_scan_count, delete_schedule, clear_audit, delete_audit, delete_scan,
-    set_finding_fix_status, rescan_diff, findings_page, stage_events,
-    trash_target, trash_scan, trash_schedule, restore_trash,
-    get_finding, set_finding_cvss, findings_matrix, compare_scans,
-    set_scan_archived, archive_scans_before,
-    audit_heatmap, db_stats, get_setting,
-    set_target_tags, get_target_tags, list_target_tags,
-    get_baseline, capture_baseline,
+    active_scan_count,
+    add_target,
+    approve_target,
+    archive_scans_before,
+    audit,
+    audit_heatmap,
+    audit_tail,
+    clear_audit,
+    compare_scans,
+    create_scan,
+    create_schedule,
+    db_stats,
+    decide_review,
+    delete_audit,
+    findings_matrix,
+    findings_of,
+    findings_page,
+    get_baseline,
+    get_finding,
+    get_scan,
+    get_setting,
+    get_target,
+    list_scans,
+    list_schedules,
+    list_target_tags,
+    list_targets,
+    pending_reviews,
+    reject_target,
+    rescan_diff,
+    restore_trash,
+    review_of,
+    set_finding_cvss,
+    set_finding_fix_status,
+    set_scan_archived,
+    set_setting,
+    set_target_tags,
+    stage_events,
+    trash_scan,
+    trash_schedule,
+    trash_target,
+    update_scan,
+    update_schedule,
+    update_target,
 )
-from reports import build_report, build_pdf_report, build_sarif, build_json, save_machine_report, build_authorization_letter
-from scanner.redact import redact_sensitive, redact_dict
+from reports import build_authorization_letter, build_json, build_pdf_report, build_report, build_sarif
+from scanner.redact import redact_dict, redact_sensitive
 from scanner.vuln_i18n import map_for_lang
 
 _OPERATOR = "analyst"  # 单机使用者标识（无多用户）
@@ -196,7 +227,7 @@ class Api:
         if not login_url:
             return _err("E_INVALID", "请填写登录端点 URL", "login_url 不能为空")
         try:
-            from scanner.vault import get_vault, mask_profile, VaultError
+            from scanner.vault import VaultError, get_vault, mask_profile
             vault = get_vault()
             method = str(profile.get("method") or "post").lower()
             if method not in ("post", "get"):
@@ -249,7 +280,7 @@ class Api:
         if not t:
             return _err("E_NOT_FOUND", "目标不存在")
         try:
-            from scanner.vault import get_vault, mask_profile, VaultError
+            from scanner.vault import VaultError, get_vault, mask_profile
             p = get_vault().get(tid)
             return {"ok": True, "profile": mask_profile(p)}
         except VaultError as e:
@@ -262,7 +293,7 @@ class Api:
         if not t:
             return _err("E_NOT_FOUND", "目标不存在")
         try:
-            from scanner.vault import get_vault, VaultError
+            from scanner.vault import VaultError, get_vault
             get_vault().delete(tid)
             audit(_OPERATOR, "auth_profile_del", t["host"], "已删除目标认证配置", "")
             return {"ok": True}
@@ -272,7 +303,7 @@ class Api:
     def list_auth_profiles(self):
         """返回全部已配置认证目标（masked 视图 + 目标 host），供设置/概览展示。"""
         try:
-            from scanner.vault import get_vault, mask_profile, VaultError
+            from scanner.vault import VaultError, get_vault, mask_profile
             out = []
             for tid in get_vault().list():
                 tt = get_target(tid)
@@ -703,7 +734,6 @@ class Api:
         所有明文凭据字段均已经 redact_dict 处理，不会泄露真实密钥。
         """
         import platform
-        import sys
 
         settings_keys = ["language", "theme", "font_size", "layout",
                          "wizard_done", "report_template"]
@@ -735,7 +765,8 @@ class Api:
 
     def selftest_report(self, json_str):
         """自检测试桥：接收前端 runSelfTest 产出的 JSON 报告并落盘（仅 --selftest 模式调用，常态无副作用）。"""
-        import json as _json, os
+        import json as _json
+        import os
         try:
             data = _json.loads(json_str)
         except Exception as e:

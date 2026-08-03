@@ -1,12 +1,11 @@
 """C-06 加密凭据保险库单元测试（tempfile 隔离，注入 Fernet key，不触碰真实库/密钥）。"""
 import os
 import tempfile
-import base64
 
 import pytest
-
-from scanner.vault import Vault, mask_profile, VaultError
 from cryptography.fernet import Fernet
+
+from scanner.vault import Vault, VaultError, mask_profile
 
 
 def _rm(p):

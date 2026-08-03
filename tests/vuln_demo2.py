@@ -10,11 +10,11 @@ scanner.cmd_injection / scanner.api_scan 的检测与阶段机集成：
 首页链接上述端点，供 collect_pages 爬取发现。
 """
 import re
-import time
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse, parse_qs
+import time
 from html import escape
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
 
 _MARKER_EXEC_RE = re.compile(r"APCMD_\$\(\((\d+)\+(\d+)\)\)")
 _CMD_DELAY_RE = re.compile(r"sleep")

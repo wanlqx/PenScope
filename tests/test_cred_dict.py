@@ -6,8 +6,7 @@
 import os
 import tempfile
 
-from scanner import cred_dict
-from scanner.cred_dict import load_default_creds, _normalize, BUNDLED_DICT_PATH, _EMBEDDED_DEFAULT_CREDS
+from scanner.cred_dict import _EMBEDDED_DEFAULT_CREDS, BUNDLED_DICT_PATH, _normalize, load_default_creds
 
 
 def _write_tmp(text):

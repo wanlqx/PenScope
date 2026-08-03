@@ -15,10 +15,10 @@
 绝不落日志、绝不外传前端。
 """
 import re
+from urllib.parse import urlparse
 
 import requests
 from requests.cookies import RequestsCookieJar
-from urllib.parse import urlparse
 
 # 判定为「登录/会话失效页」的信号
 _LOGIN_FORM_RE = re.compile(r"type\s*=\s*[\"']?\s*password", re.IGNORECASE)

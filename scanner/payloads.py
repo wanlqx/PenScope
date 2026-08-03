@@ -5,8 +5,9 @@
  3) 编码绕过：依据放行情况切换 URL / 双重 / Unicode 编码
 所有载荷仅用于漏洞"检测/验证"，不携带破坏性指令。
 """
-import re
 import random
+import re
+
 import requests
 
 # 常见 WAF 指纹（响应头 / 状态码 / 特征串）

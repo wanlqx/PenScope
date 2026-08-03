@@ -6,11 +6,12 @@
 - subdomain：注入式 resolver/fetcher 模拟 DNS 与 crt.sh，验证被动枚举与「排除自身/不自动扫描」。
 不依赖真实外网；不向任何外部目标发起请求。
 """
-import sys
 import os
 import socket
+import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
 import requests
 
 # 让脚本在仓库根目录运行

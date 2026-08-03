@@ -25,8 +25,8 @@ PenScope —— 发布自动化脚本（本地辅助工具）
 """
 import os
 import re
-import sys
 import subprocess
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)

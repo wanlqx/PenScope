@@ -8,9 +8,9 @@ if os.path.exists(_tmp):
     os.remove(_tmp)
 os.environ["AUTOPENTEST_DB"] = _tmp
 
+import app_api
 import config
 import db
-import app_api
 
 print("== config ==")
 print("VERSION:", config.VERSION, "| DB_PATH:", config.DB_PATH)
@@ -60,6 +60,7 @@ print("updated:", api.get_settings())
 print("\n== 发现去重 ==")
 # 模拟同一次扫描连续写入相同发现
 from db import add_finding, findings_of
+
 add_finding(sid, "端口暴露", "开放端口 22/ssh", "Info", "服务: ssh", "SSH-2.0", "关闭端口", "192.168.1.1:22")
 add_finding(sid, "端口暴露", "开放端口 22/ssh", "Info", "服务: ssh", "SSH-2.0", "关闭端口", "192.168.1.1:22")
 add_finding(sid, "端口暴露", "开放端口 22/ssh", "Info", "服务: ssh", "duplicate evidence", "关闭端口", "192.168.1.1:22")

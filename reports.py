@@ -2,13 +2,14 @@
 生成包含 CVSS 3.1 评分、漏洞分类、复现步骤、影响范围、修复与预防建议的完整 HTML 报告。
 PDF 输出依赖可选库 weasyprint / pdfkit；未安装时返回 html 供浏览器打印保存。
 """
+import datetime
 import json
 import os
-import datetime
-from config import RISK_CN, BASE_DIR, VERSION
-from db import get_target, findings_of
-from cvss_dedup import cvss_for
+
 from chain import analyze_chains
+from config import BASE_DIR, RISK_CN, VERSION
+from cvss_dedup import cvss_for
+from db import findings_of, get_target
 
 # SARIF 2.1.0 风险等级 → 结果 severity
 _SARIF_LEVEL = {
@@ -275,7 +276,7 @@ def _report_shared(scan):
         summary = json.loads(scan["summary"] or "{}")
     except Exception:
         pass
-    counts = summary.get("risk_counts", {lv: 0 for lv in _RISK_ORDER})
+    counts = summary.get("risk_counts", dict.fromkeys(_RISK_ORDER, 0))
     total = summary.get("total_findings", len(findings))
     max_cvss = 0.0
     for f in findings:

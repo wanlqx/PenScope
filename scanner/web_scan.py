@@ -7,11 +7,12 @@
 供报告生成与语义去重使用（借鉴 VulnClaw 的结构化发现模型）。
 """
 import re
-import requests
-from scanner.payloads import PayloadGenerator, detect_waf, detect_db_from_error
-from scanner.scope import redirect_target_blocked
-from cvss_dedup import cwe_for
 
+import requests
+
+from cvss_dedup import cwe_for
+from scanner.payloads import detect_db_from_error
+from scanner.scope import redirect_target_blocked
 
 # 布尔盲注多轮采样参数（误报率降低：要求多轮稳定差异才判定，消除动态内容干扰）
 _SQLI_BOOL_TRUE = "' AND 1=1-- "
@@ -141,7 +142,6 @@ def _safe_follow(session, url, timeout, verify_ssl, base_host, max_hops=5):
         loc = r.headers["Location"]
         next_url = urljoin(r.url, loc)
         nu = urlparse(next_url)
-        nh = nu.netloc.split(":")[0]
         # 作用域校验：仅跟随与起始目标同作用域的重定向（SSRF 围栏，AP-001）
         if redirect_target_blocked(nu.netloc, base_host):
             return None
@@ -159,7 +159,7 @@ def _sql_poc(target, method, field, payload):
 
 def scan_sqli(url, session, pg, timeout=6.0, verify_ssl=True):
     """SQL 注入检测：错误型 + 布尔盲注 + 时间盲注二次验证。按表单声明的 GET/POST 方法提交（含全部字段）。"""
-    from urllib.parse import urlparse, urlunparse, parse_qs
+    from urllib.parse import parse_qs, urlparse, urlunparse
     findings = []
     forms = discover(url, session, timeout, verify_ssl)
     test_points = []  # (target, method, param, all_fields)
@@ -221,12 +221,11 @@ def scan_sqli(url, session, pg, timeout=6.0, verify_ssl=True):
                 else:
                     stable = False
             if saw_diff and stable:
-                diff = abs(true_lens[0] - false_lens[0])
                 b = _verify_sqli_time(session, target, method, fields, p, verify_ssl)
                 if b:
                     findings.append(_mk(
                         "SQL注入", f"参数 '{p}' 存在时间盲注", "High",
-                        f"注入 SLEEP/延迟载荷后响应明显延迟，确认该参数存在 SQL 注入（时间盲注）。",
+                        "注入 SLEEP/延迟载荷后响应明显延迟，确认该参数存在 SQL 注入（时间盲注）。",
                         f"time-based delay verified; baseline={b}",
                         "使用参数化查询/预编译语句；对数据库账户最小权限化；部署 WAF 与输入校验。",
                         target,
@@ -261,7 +260,8 @@ def _verify_sqli_time(session, target, method, fields, p, verify_ssl, delay=2.0)
     返回：验证通过时返回基线摘要 dict（truthy，供证据记录）；否则返回 False。
     """
     import time as _time
-    from scanner.baseline import sample_times, is_significant_delay, baseline_digest
+
+    from scanner.baseline import baseline_digest, is_significant_delay, sample_times
 
     payloads = [
         f"1 AND (SELECT SLEEP({int(delay)}) FROM dual)-- ",
@@ -294,7 +294,7 @@ def _verify_sqli_time(session, target, method, fields, p, verify_ssl, delay=2.0)
 
 def scan_xss(url, session, pg, timeout=6.0, verify_ssl=True):
     """反射型 XSS 检测：先发送唯一标记确认反射点，再验证 payload 是否在可执行上下文中回显，减少误报。"""
-    from urllib.parse import urlparse, urlunparse, parse_qs
+    from urllib.parse import parse_qs, urlparse, urlunparse
     findings = []
     forms = discover(url, session, timeout, verify_ssl)
     test_points = []

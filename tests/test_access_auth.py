@@ -4,13 +4,11 @@
   - 缺失授权：强制浏览命中 / 基线防误报（404 基线页不报）/ 无 200 不报；权限指示参数观察(L1)
   - 认证缺陷：被动登录端点识别(L1) / 凭证出现在 URL query(L1)；opt-in 默认凭据命中(High/L3)
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import scanner.access_control as ac
-import scanner.auth as auth
 from scanner.access_control import scan_access_control
 from scanner.auth import scan_auth
 

@@ -11,13 +11,13 @@
     * 恒真/恒假响应长度稳定差异 -> 报 Medium（真阳性保留）
 """
 import threading
-import random
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import parse_qs, urlparse
 
 import requests
-from scanner.web_scan import scan_csrf, scan_sqli
+
 from scanner.payloads import PayloadGenerator
+from scanner.web_scan import scan_csrf, scan_sqli
 
 _PG = PayloadGenerator()
 

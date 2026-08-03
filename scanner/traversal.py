@@ -8,10 +8,12 @@
     避免把页面原本就存在的内容（如自带示例）误报为漏洞；
   - 所有判定均为 unverified / L2，明确标注"需人工复核"，不夸大结论。
 """
+from urllib.parse import parse_qs, urlparse, urlunparse
+
 import requests
-from urllib.parse import urlparse, urlunparse, parse_qs
-from scanner.web_scan import discover, _send_form, _mk
+
 from cvss_dedup import cwe_for
+from scanner.web_scan import _mk, _send_form, discover
 
 # Linux /etc/passwd 与 Windows win.ini 的内容特征
 _PASSWD_MARKERS = (

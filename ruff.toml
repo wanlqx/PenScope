@@ -1,0 +1,51 @@
+# PenScope —— Ruff 配置
+# 用途：作为 CI 硬门禁（见 .github/workflows/ci.yml 的 lint job）。
+# 设计原则：
+#   - 拦「真问题」：未定义名称 / 未使用导入或变量（F）、明显缺陷模式（B）、导入顺序（I）、
+#     基础风格与语法错误（E/W）、集合 / 推导 / f-string 等可读性问题（C4/SIM/RUF）。
+#   - 不拦「风格噪音 / 中文语境误报」：下列规则在本项目探测 / 兜底 / 审计代码或中文注释中
+#     是有意写法或海量误报，忽略以免门禁形同虚设。
+# 与 .pre-commit-config.yaml 共享同一份规则。
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = [
+    "E",      # pycodestyle 错误（缩进 / 空格 / 语句等真实问题）
+    "F",      # Pyflakes：未定义名称、未使用导入 / 变量（真 bug）
+    "W",      # pycodestyle 警告
+    "I",      # isort：导入顺序
+    "B",      # flake8-bugbear：易错模式（真 bug 倾向）
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "RUF",    # Ruff 专项（unused noqa / f-string 拼接等）
+]
+ignore = [
+    # —— 中文代码库误报 ——
+    "RUF001",  # 字符串含全角标点（中文注释 / 文案）误报
+    "RUF002",  # docstring 含全角标点误报
+    "RUF003",  # 注释含全角标点误报
+    # —— 有意写法 / 风格噪音 ——
+    "E402",    # 导入不在文件顶部：sys.path.insert / log=getLogger 等有意写法
+    "E501",    # 行过长：桌面应用含长 SQL / 文案字符串
+    "E702",    # 一行多语句（分号）：个别历史写法
+    "B904",    # raise 未带 from：本代码库有意（通用异常转译）
+    "C401",    # 冗余生成器 set
+    "C416",    # 冗余推导
+    "SIM105",  # try-except-pass -> contextlib.suppress：探测 / 兜底路径有意保留
+    "SIM108",  # if-else 表达式化：轻微
+    "SIM110",  # 重实现内置 any/all：轻微
+    "SIM115",  # open 未用 with：部分路径有意（如追加日志）
+    "SIM118",  # `x in dict.keys()`：轻微
+    "SIM102",  # 可合并 if：轻微
+    "SIM103",  # 冗余 bool：轻微
+    "SIM114",  # if 同分支：轻微
+    "RUF005",  # 集合字面量拼接：轻微
+    "RUF010",  # f-string 显式类型转换：轻微
+    "RUF059",  # 解包未使用变量：常见有意写法
+]
+
+[lint.per-file-ignores]
+# 测试 / 演示脚本允许更宽松的写法（如演示用全局变量、重复断言）
+"tests/*" = ["B", "SIM"]
+"demos/*" = ["B", "SIM"]

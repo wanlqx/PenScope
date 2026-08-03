@@ -11,8 +11,8 @@
 """
 import json
 
-from db import list_targets, scans_of_target, findings_of_target, findings_of, get_baseline
 from chain import analyze_chains
+from db import findings_of, findings_of_target, get_baseline, list_targets, scans_of_target
 
 _RISK_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0,
               "": 0, None: 0}

@@ -13,7 +13,6 @@
 - 不引入网络 / 扫描逻辑，仅做数据比对，保证可测试与无副作用。
 """
 
-import json
 
 # 标量字段：值不同即视为变更
 _SCALAR_FIELDS = ("fingerprint", "title")
@@ -82,7 +81,7 @@ def check_and_apply_baseline(target_id, new_snapshot):
     调用方应据此决定是否通知/自动扫描。无 DB 依赖之外的副作用。
     依赖 db.capture_baseline / db.get_baseline（延迟 import 以避免循环）。
     """
-    from db import get_baseline, capture_baseline
+    from db import capture_baseline, get_baseline
     old = get_baseline(target_id)
     changes = diff_asset_snapshot(old, new_snapshot)
     snap = normalize_snapshot(new_snapshot)

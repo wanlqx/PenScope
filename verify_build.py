@@ -22,12 +22,12 @@ verify_build.py — PenScope 构建后校验
     不落盘临时文件——避免在某些受沙箱重定向的 python 下，临时文件经 junction 解析失败
     触发 PyInstaller "文件已移动/删除" 保护而误报。
 """
+import marshal
 import os
 import re
 import struct
-import marshal
-import zlib
 import sys
+import zlib
 
 from PyInstaller.archive.readers import CArchiveReader
 

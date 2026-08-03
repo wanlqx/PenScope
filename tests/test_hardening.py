@@ -8,9 +8,9 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import app_api
 import config
 import db as dbmod
-import app_api
 
 
 def _tmp_db():

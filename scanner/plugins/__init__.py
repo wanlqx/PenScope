@@ -6,9 +6,9 @@
 
 load_plugins() 返回 BaseScanner 实例列表；单个插件加载/实例化失败只告警，不影响其他插件。
 """
-import os
-import logging
 import importlib.util
+import logging
+import os
 
 from scanner.plugin_base import BaseScanner
 
@@ -18,7 +18,7 @@ _LOG = logging.getLogger("PenScope.plugins")
 EXTERNAL_DIR = os.path.join(os.path.expanduser("~"), ".autopentest", "plugins")
 
 # 内置示例插件：显式 import 以确保被打包工具收集，并纳入内置列表。
-from scanner.plugins.example_headers import ExampleSecurityHeadersScanner  # noqa: F401
+from scanner.plugins.example_headers import ExampleSecurityHeadersScanner
 
 _CACHE = None
 

@@ -10,6 +10,7 @@ make_icon.py —— 为 PenScope 生成方案B SOC 主题图标
 仅依赖 Pillow，无外部素材。
 """
 import os
+
 from PIL import Image, ImageDraw
 
 SIZE = 256

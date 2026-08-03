@@ -1,13 +1,11 @@
 """C-06 可续期会话单元测试：用本地 HTTP 服务器模拟登录 / 会话失效 / 自动续期。"""
 import http.server
-import socketserver
 import threading
 import urllib.parse
 
 import pytest
 
 from scanner.session_renew import SessionRenewal, _login_form_present
-
 
 LOGIN_FORM = (
     "<html><body><form method=post action=/login>"

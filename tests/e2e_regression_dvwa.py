@@ -15,9 +15,8 @@
 """
 import os
 import sys
-import json
-import time
 import tempfile
+import time
 
 # 必须在 import db/run_scans 之前设置隔离 DB，避免污染真实库
 _TMP_DB = os.path.join(tempfile.gettempdir(), f"autopentest_regr_{int(time.time())}.db")
@@ -59,6 +58,7 @@ def main():
 
     # 直接验证 AP-001 修复：localhost 靶场的页面爬取不再被回环护栏误杀
     import requests
+
     from scanner.web_scan import collect_pages
     s = requests.Session()
     s.headers.update({"User-Agent": "PenScope/1.0 (authorized e2e)"})

@@ -15,10 +15,9 @@
    信息泄露端点(phpinfo)等可访问或被拒绝(403)存在。
 """
 import re
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 from scanner.web_scan import _mk
-from cvss_dedup import cwe_for
 
 # 只探测「已知敏感/常见」路径；规模克制，不做无差别全字典爆破（避免噪音与合规风险）
 _PATH_WORDLIST = [
@@ -100,7 +99,6 @@ def scan_content(base_url, session, timeout=6.0, verify_ssl=True, paths=None):
     """对 base_url 所在主机做目录/敏感信息被动扫描。仅只读 GET/HEAD。"""
     findings = []
     paths = paths or _PATH_WORDLIST
-    host_part = "{0}://{1}".format(*urlparse(base_url)[:2])
 
     for p in paths:
         url = urljoin(base_url, p).split("#")[0]
@@ -144,7 +142,7 @@ def scan_content(base_url, session, timeout=6.0, verify_ssl=True, paths=None):
                 findings.append(_mk(
                     "目录暴露", f"目录列表开启：{url}", "Low",
                     "目标开启了目录列表（Index of），可浏览目录下文件，可能泄露备份/源码等。",
-                    f"status=200 命中目录列表标识",
+                    "status=200 命中目录列表标识",
                     "关闭 Web 服务器目录列表（Indexes）；对静态目录显式提供索引或返回 403。",
                     url, cwe="CWE-548", endpoint=url, http_method="GET",
                     verification_status="unverified", evidence_level="L2",
@@ -203,6 +201,7 @@ def scan_content(base_url, session, timeout=6.0, verify_ssl=True, paths=None):
 
 if __name__ == "__main__":
     import sys
+
     import requests
     b = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:18099"
     s = requests.Session()

@@ -15,11 +15,12 @@
 真正利用需结合其他环节，故 verification_status=unverified。
 """
 import re
-from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
-from scanner.web_scan import discover, _mk
+
 from cvss_dedup import cwe_for
+from scanner.web_scan import _mk, discover
 
 _UA = "PenScope/1.0 (authorized security test)"
 

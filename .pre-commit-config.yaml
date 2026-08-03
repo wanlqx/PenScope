@@ -1,0 +1,21 @@
+# PenScope —— 本地提交前钩子（提高 PR 质量、减少 CI 失败）
+# 安装：pip install pre-commit && pre-commit install
+# 手动全量运行：pre-commit run --all-files
+# 说明见 CONTRIBUTING.md「本地开发工具（pre-commit）」一节。
+default_language_version: python3.11
+minimum_pre_commit_version: "3.5.0"
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        args: ["-r", "scanner", "app_api.py", "-ll"]
+        additional_dependencies: ["bandit[toml]"]

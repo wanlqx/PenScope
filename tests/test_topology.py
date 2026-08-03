@@ -4,7 +4,6 @@
 遵循项目约定：临时 DB 单测用 _tmp_db() 覆盖 config.DB_PATH / db.DB_PATH，finally 中 os.remove。
 """
 
-import json
 import os
 import sys
 import tempfile
@@ -15,8 +14,12 @@ import config as cfg
 import db as dbmod
 import topology
 from db import (
-    add_target, approve_target, create_scan, update_scan,
-    add_finding, findings_of,
+    add_finding,
+    add_target,
+    approve_target,
+    create_scan,
+    findings_of,
+    update_scan,
 )
 
 

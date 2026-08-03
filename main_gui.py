@@ -6,19 +6,18 @@
 增加系统托盘菜单（显示/隐藏、设置、打开数据目录、退出）；关闭窗口时最小化到托盘。
 控制台输出重定向到文件日志，便于 --windowed（无终端）打包后排错。
 """
-import os
-import sys
-import time
+import ctypes
 import logging
 import logging.handlers
+import os
+import sys
 import threading
-import ctypes
-from ctypes import wintypes
+import time
 
+import app_api
 import config
 import db
 import run_scans
-import app_api
 
 # ---------------- 文件日志（替代控制台，避免 --windowed 下无输出） ----------------
 # 使用 RotatingFileHandler：单文件上限 10MB，保留最近 5 个备份，防止日志无限增长占满磁盘。
@@ -37,10 +36,10 @@ logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 # ---------------- 托盘 / 窗口依赖（可选） ----------------
 try:
-    import webview
     import pystray
-    from pystray import Menu, MenuItem
+    import webview
     from PIL import Image
+    from pystray import Menu, MenuItem
     HAS_TRAY = True
     HAS_WEBVIEW = True
 except Exception as e:  # 无 WebView2/pystray 时无法运行（无后端可回退）
@@ -70,7 +69,7 @@ def _open_data_folder():
     d = config.BASE_DIR
     try:
         if sys.platform.startswith("win"):
-            os.startfile(os.path.normpath(d))  # noqa: S606 (仅打开本机已知目录，已 normpath 规范化)
+            os.startfile(os.path.normpath(d))
         else:
             import webbrowser
             webbrowser.open(f"file://{d}")

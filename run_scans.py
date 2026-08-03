@@ -2,38 +2,71 @@
 阶段机：scope_check → recon → subdomain_enum → web_detect → [闸门] exploit_verify → [闸门] upload_test → report
 关键决策节点（exploit_verify / upload_test）会被暂停，等待安全分析员在复核队列批准后才继续。
 """
-import json
-import time
-import socket
-import ipaddress
-import datetime
 import asyncio
+import datetime
+import ipaddress
+import json
+import logging
+import socket
+import time
+
 import requests
+from requests.adapters import HTTPAdapter
+
 import config
-from config import COMMON_PORTS, DEFAULT_TIMEOUT, ENABLE_AUTH_PROBE
-from db import (
-    get_scan, update_scan, get_target, add_finding, findings_of,
-    create_review, pending_scans, audit, create_scan, list_schedules,
-    update_schedule, record_stage_event, fail_scan, get_setting,
-)
-from scanner.port_scan import scan_ports, fingerprint_web
-from scanner.web_scan import scan_sqli, scan_xss, scan_csrf, find_upload_forms, collect_pages, _send_form, discover
-from scanner.cmd_injection import scan_cmd
-from scanner.api_scan import scan_api
-from scanner.subdomain import scan_subdomain_assets
-from scanner.contentscan import scan_content
-from scanner.mail_probe import scan_mail, MAIL_PORTS
-from scanner.traversal import scan_traversal
-from scanner.ssrf import scan_ssrf
-from scanner.access_control import scan_access_control
-from scanner.auth import scan_auth
-from scanner.open_redirect import scan_open_redirect
-from scanner.payloads import PayloadGenerator, detect_waf, detect_db_from_error
-from scanner.vuln_db import match_vulns
-from scanner.plugins import load_plugins
-from scanner.plugin_base import ScanContext
-from cvss_dedup import cwe_for
+
+log = logging.getLogger("PenScope.scan")
+
+# 统一的 Session 创建入口（明确的 Session 使用策略，见用户评审 P3「run_scans 并发」）：
+# - 固定 UA 与连接池上限，避免模块各处散落 requests.Session() 带来的连接池 / 线程安全隐患；
+# - 扫描主流程复用模块级 _session；验证阶段用独立 _new_session() 隔离残留 Cookie，保证可复现。
+_POOL_MAXSIZE = 20
+
+
+def _new_session():
+    """创建带连接池与固定 UA 的 requests.Session（验证阶段 / 隔离用）。"""
+    s = requests.Session()
+    s.headers.update({"User-Agent": "PenScope/1.0 (authorized security test)"})
+    adapter = HTTPAdapter(pool_connections=_POOL_MAXSIZE, pool_maxsize=_POOL_MAXSIZE)
+    s.mount("http://", adapter)
+    s.mount("https://", adapter)
+    return s
 import re
+
+from config import COMMON_PORTS, DEFAULT_TIMEOUT, ENABLE_AUTH_PROBE
+from cvss_dedup import cwe_for
+from db import (
+    add_finding,
+    audit,
+    create_review,
+    create_scan,
+    fail_scan,
+    findings_of,
+    get_scan,
+    get_setting,
+    get_target,
+    list_schedules,
+    pending_scans,
+    record_stage_event,
+    update_scan,
+    update_schedule,
+)
+from scanner.access_control import scan_access_control
+from scanner.api_scan import scan_api
+from scanner.auth import scan_auth
+from scanner.cmd_injection import scan_cmd
+from scanner.contentscan import scan_content
+from scanner.mail_probe import MAIL_PORTS, scan_mail
+from scanner.open_redirect import scan_open_redirect
+from scanner.payloads import PayloadGenerator, detect_db_from_error, detect_waf
+from scanner.plugin_base import ScanContext
+from scanner.plugins import load_plugins
+from scanner.port_scan import fingerprint_web, scan_ports
+from scanner.ssrf import scan_ssrf
+from scanner.subdomain import scan_subdomain_assets
+from scanner.traversal import scan_traversal
+from scanner.vuln_db import match_vulns
+from scanner.web_scan import _send_form, collect_pages, discover, find_upload_forms, scan_csrf, scan_sqli, scan_xss
 
 # U-02：闸门通知钩子（由 main_gui 注册，用于系统托盘气泡 + 任务栏闪烁）。
 # 解耦设计：run_scans 不直接依赖 GUI；main_gui 在启动时注册监听器，
@@ -86,6 +119,8 @@ def push_scan_event(scan_id, stage=None, status=None, note=None):
         _PUSH_WINDOW.evaluate_js(js)
     except Exception:
         # 窗口未就绪 / 已销毁 / 线程调度异常 —— 静默忽略，前端仍有兜底轮询。
+        # 注：pywebview 的 evaluate_js 自 v4 起设计为可从任意线程调用（内部路由到 GUI 线程），
+        # 此处仍保留 try/except 作为最后兜底，避免 GUI 线程异常中断扫描 worker。
         pass
 
 
@@ -123,8 +158,7 @@ def _fkwargs(f):
         "evidence_meta": f.get("evidence_meta"),
     }
 
-_session = requests.Session()
-_session.headers.update({"User-Agent": "PenScope/1.0 (authorized security test)"})
+_session = _new_session()
 
 # 同 IP 多 vhost 端口探测复用缓存：以「解析 IP + 端口集合」为键，避免对共享公网 IP 的
 # 多个子域重复做整轮端口扫描（仅复用端口结果，vhost 级 Web 检测仍逐主机执行）。
@@ -307,7 +341,7 @@ def _stage_subdomain_enum(scan):
                     f"通过证书透明度/常见子域被动解析发现 {sub}，解析到 {ip}。"
                     f"该资产不在本次授权目标清单内，如需扫描须经二次授权后单独添加目标。",
                     f"resolved_ip={ip}", "如发现未授权资产，请经二次授权后在「授权目标」中手动添加"
-                    f"并审批，再发起扫描（作用域围栏）。", sub,
+                    "并审批，再发起扫描（作用域围栏）。", sub,
                     cwe="CWE-200", endpoint=sub, http_method="DNS",
                     verification_status="info", evidence_level="L1")
     audit(scan["created_by"], "subdomain_done", host,
@@ -506,10 +540,10 @@ def _apply_asset_baseline(scan, banners, titles):
       asset_autoscan      : 变更后自动创建增量扫描（默认关）
     首次建立基线不告警；无变更不动作。"""
     try:
-        from db import get_setting, create_scan, audit, get_target
         import asset_watch
         import notify
-        if not (str(get_setting("asset_change_alert") or "").lower() in ("1", "true")):
+        from db import audit, create_scan, get_setting, get_target
+        if str(get_setting("asset_change_alert") or "").lower() not in ("1", "true"):
             # 总开关关闭：仍建立/刷新基线，便于日后开启即具备对比历史
             asset_watch.check_and_apply_baseline(scan["target_id"],
                                                  _build_snapshot(banners, titles))
@@ -561,10 +595,11 @@ def _build_snapshot(banners, titles):
 def _build_renewal(t, vs):
     """C-06：若目标已配置凭据且会话续期开启，构造并登录续期控制器；否则返回 None。
     登录失败仅审计、不阻断扫描（降级为匿名会话继续）。"""
+    from db import audit
     try:
-        from scanner.vault import get_vault
-        from scanner.session_renew import SessionRenewal
         from config import ENABLE_SESSION_RENEW, SESSION_RENEW_MAX
+        from scanner.session_renew import SessionRenewal
+        from scanner.vault import get_vault
         if not ((str(get_setting("enable_session_renew") or "").lower() in ("1", "true")) or ENABLE_SESSION_RENEW):
             return None
         profile = get_vault().get(t["id"])
@@ -580,7 +615,6 @@ def _build_renewal(t, vs):
         return None
     except Exception as e:
         try:
-            from db import audit
             audit(t.get("created_by", "system"), "session_renew_err", t.get("host", "?"),
                   f"会话续期初始化异常: {e}")
         except Exception:
@@ -672,11 +706,10 @@ def _verify_sqli(ref, verify_ssl=True):
     sqli_blind_t 等）。
     采用 (SELECT SLEEP(N) FROM dual) 使休眠在多数情况下只执行一次；若因逐行求值导致请求超时，
     该超时本身即证明注入可控（正常页面不会因该载荷挂起），故一并计为验证成功。"""
-    from urllib.parse import urlparse, urlunparse, parse_qs
+    from urllib.parse import parse_qs, urlparse, urlunparse
     # 使用独立的新会话做验证，避免扫描爬取阶段累积的 Cookie 影响目标行为（已观察到
     # 残留会话态导致部分时间盲注不再触发的非确定性），保证验证可复现。
-    vsession = requests.Session()
-    vsession.headers.update({"User-Agent": "PenScope/1.0 (authorized security test)"})
+    vsession = _new_session()
     candidates = []
     q = urlparse(ref)
     base = urlunparse(q._replace(query="", fragment=""))
@@ -744,9 +777,8 @@ def _verify_cmd(ref, verify_ssl=True):
     `sleep` 载荷；若响应明显延迟则视为命令被执行（正常页面不会因该载荷挂起）。
     使用独立会话避免残留 Cookie 影响目标行为，保证验证可复现。
     仅证明可利用，不提取数据、不执行破坏性命令。"""
-    vsession = requests.Session()
-    vsession.headers.update({"User-Agent": "PenScope/1.0 (authorized security test)"})
-    from urllib.parse import urlparse, urlunparse, parse_qs
+    vsession = _new_session()
+    from urllib.parse import parse_qs, urlparse, urlunparse
     q = urlparse(ref)
     base = urlunparse(q._replace(query="", fragment=""))
     try:
@@ -865,7 +897,7 @@ def _stage_upload_test(scan):
 
 def _stage_report(scan):
     findings = findings_of(scan["id"])
-    counts = {lv: 0 for lv in ["Critical", "High", "Medium", "Low", "Info"]}
+    counts = dict.fromkeys(["Critical", "High", "Medium", "Low", "Info"], 0)
     for f in findings:
         counts[f["risk"]] = counts.get(f["risk"], 0) + 1
     summary = json.loads(scan["summary"] or "{}")
@@ -910,10 +942,16 @@ def process_scan(scan):
     if not func:
         return
 
+    # 结构化日志：把 scan_id / target_id 绑定到上下文，便于问题追踪与日志聚合。
+    log_adapter = logging.LoggerAdapter(
+        log, {"scan_id": sid, "target": scan.get("target_id")})
+
     def _evt(st, stt, note=None):
-        # 阶段事件：同时落库（甘特图数据源）与推送前端（P-06 实时进度）。
+        # 阶段事件：同时落库（甘特图数据源）、推送前端（P-06 实时进度）、写结构化日志。
         record_stage_event(sid, st, stt, note)
         push_scan_event(sid, stage=st, status=stt, note=note)
+        log_adapter.info("stage %s -> %s%s", st, stt,
+                         f" ({note})" if note else "")
 
     _evt(stage, "start")
     try:

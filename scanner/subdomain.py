@@ -8,8 +8,8 @@
   若需进一步扫描，必须经二次授权（作用域围栏），由使用者在应用内手动添加目标。
 - resolver / fetcher 可注入，便于离线单元测试（无需真实外网）。
 """
-import socket
 import json
+import socket
 
 # 多段顶级域（取基础域名时需多退一层）
 _MULTI_TLD = (

@@ -9,10 +9,11 @@
 """
 import re
 import threading
-import requests
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse, parse_qs
 from html import escape
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
+
+import requests
 
 from scanner.cmd_injection import scan_cmd
 

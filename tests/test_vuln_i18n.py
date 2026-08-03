@@ -6,7 +6,7 @@
   - map_for_lang 仅返回该语言有定义的字段，且结构为 {cwe: {name, remediation}}
   - 已知 CWE（如 CWE-79 / CWE-89）在两种语言下均有 name 定义
 """
-from scanner.vuln_i18n import localize, map_for_lang, VULN_I18N
+from scanner.vuln_i18n import VULN_I18N, localize, map_for_lang
 
 
 def test_localize_returns_lang_text():

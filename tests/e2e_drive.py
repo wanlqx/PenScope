@@ -8,10 +8,9 @@
   - /login 表单出现在首页 /、/login、/admin → 错误型 SQLi 应合并为 1 条（而非 3）
   - /sqli 同时有 GET ?id= 与 POST 表单 → 时间盲注应合并为 1 条（而非 2）
 """
-import os
-import sys
-import time
 import json
+import os
+import time
 
 import db
 import reports

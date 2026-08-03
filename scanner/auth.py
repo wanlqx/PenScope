@@ -12,11 +12,13 @@
 "默认只读、不爆破、不写"原则，把主动动作交给用户明确授权（config.ENABLE_AUTH_PROBE）。
 """
 import re
+from urllib.parse import parse_qs, urlparse
+
 import requests
-from urllib.parse import urlparse, parse_qs
-from scanner.web_scan import discover, _mk
+
 from cvss_dedup import cwe_for
 from scanner.cred_dict import load_default_creds
+from scanner.web_scan import _mk, discover
 
 _UA = "PenScope/1.0 (authorized security test)"
 

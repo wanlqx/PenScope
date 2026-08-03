@@ -13,9 +13,8 @@
 但无法防御「已登录同机账户」的攻击者（其可同时取到密钥与密文）。请勿在共享/多用户主机上存储高权限凭据；
 如确需更高保护，可经环境变量 AUTOPENTEST_VAULT_KEY 注入由外部密钥管理（如系统凭据管理器）下发的临时密钥。
 """
-import os
 import json
-import base64
+import os
 
 try:
     from cryptography.fernet import Fernet, InvalidToken
@@ -25,7 +24,7 @@ except Exception:  # pragma: no cover - 极罕见：构建环境缺 cryptography
     InvalidToken = Exception
     _HAS_CRYPTO = False
 
-from config import DB_PATH, BASE_DIR
+from config import DB_PATH
 
 
 def _vault_paths():

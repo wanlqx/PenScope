@@ -18,6 +18,12 @@ PenScope 是一款**授权式**自动化渗透测试工具，仅供你对**已�
   - 前端 `get_auth_profile` 只返回掩码，**后端绝不回传明文密码**。
 - 扫描目标、发现、日志等用户数据保存在 exe 同级数据库（`autopentest.db`），均属于本地运行时数据，不随仓库分发。
 
+### 2.1 凭据保险库密钥的存放与备份
+
+- 密钥文件 `autopentest.key` 与保险库数据 `autopentest_vault.bin` 均位于 exe 同级目录（随 `AUTOPENTEST_DB` 迁移）。
+- **Windows 上**：生成密钥后通过 `icacls` 去除继承并仅授权当前用户只读（`scanner/vault.py` 的 `_harden_key_permissions`），比 POSIX `chmod 0600` 在 Windows 上更有效；同机非管理员用户仍可能读取，请勿在多用户主机共享账户下使用。
+- **备份与丢失后果**：保险库用 Fernet（对称）加密，**密钥一旦丢失，已存凭据不可恢复**。若需保留已存凭据，请一并备份 `autopentest.key`（与保险库数据一起）；迁移到新机器时把 `key` + `vault.bin` 一并带走即可。更新 `AUTOPENTEST_VAULT_KEY` 环境变量可轮换为自管密钥。
+
 > 贡献者在提交前请确认：`git status` 中不应出现任何 `*.key`、`*vault*.json`、`*.db`、`*.log` 或个人目标信息。
 
 ## 3. 漏洞上报

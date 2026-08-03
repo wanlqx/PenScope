@@ -4,15 +4,13 @@
   - 路径遍历：强证据命中 / 基线已含特征(防误报) / 无特征不报
   - SSRF：file:// 本地文件读取命中 / 云元数据命中 / 仅 URL 参数(注入点观察) / 无相关参数不报
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import scanner.traversal as traversal
-import scanner.ssrf as ssrf
-from scanner.traversal import scan_traversal, _detect_file_content
-from scanner.ssrf import scan_ssrf, _detect_metadata, _URL_PARAM_RE
+from scanner.ssrf import _URL_PARAM_RE, _detect_metadata, scan_ssrf
+from scanner.traversal import _detect_file_content, scan_traversal
 
 
 class _Resp:

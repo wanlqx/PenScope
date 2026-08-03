@@ -7,9 +7,9 @@
 - set_finding_cvss 的向量格式守门（合法写入 / 非法拒绝 / 评分越界拒绝）；
 - db._CVSS31_RE 对标准向量的接受与拒绝。
 """
+import json
 import os
 import sys
-import json
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

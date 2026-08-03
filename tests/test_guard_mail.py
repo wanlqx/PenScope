@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """T78/T79/T80 回归测试：私有地址护栏、邮件明文/STARTTLS 分类、vhost 端口复用缓存。"""
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import run_scans
-from scanner.mail_probe import _classify, MAIL_PORTS
+from scanner.mail_probe import _classify
 
 
 def test_private_guard():

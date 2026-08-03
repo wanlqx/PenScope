@@ -14,10 +14,11 @@
 检测均为启发式，标记为 unverified / L2，需人工结合授权范围确认。
 """
 import re
+from urllib.parse import urljoin
+
 import requests
-from urllib.parse import urlparse, urljoin
+
 from scanner.web_scan import _mk
-from cvss_dedup import cwe_for
 
 _API_PATH_HINTS = (
     "/api/", "/v1/", "/v2/", "/rest/", "/graphql", "/swagger", "/api-docs",
@@ -53,7 +54,6 @@ def _candidate_urls(base_url, pages):
     """汇总 API 候选端点：爬取到的 API 风格链接 + 常见 API/文档路径。"""
     seen = set()
     out = []
-    host_part = "{0}://{1}".format(*urlparse(base_url)[:2])
     for p in pages:
         low = p.lower()
         if any(h in low for h in _API_PATH_HINTS):

@@ -6,7 +6,8 @@
 
 ## 1. 开发环境
 
-要求：Python 3.11+（CI 使用 3.11），Windows 推荐（GUI 使用 pywebview + WebView2）。
+要求：Python **3.11**（CI 固定用 3.11；本地 3.11+ 均可）。GUI 依赖 pywebview + WebView2，**Windows 推荐**用于运行/打包；纯逻辑测试在 Windows / Ubuntu 均可运行（见 CI 矩阵）。
+打包工具：**PyInstaller 6.x**（当前锁定 `6.21.0`，见 `requirements-lock.txt`）。
 
 ```bash
 # 克隆
@@ -18,14 +19,24 @@ python -m venv .venv
 .venv\Scripts\activate        # Windows
 # source .venv/bin/activate   # macOS / Linux
 
-# 安装依赖
-pip install -r requirements.txt
-pip install pytest ruff bandit pip-audit   # 开发期额外工具
+# 安装依赖（优先用锁文件保证可复现；锁文件滞后时回退到 requirements.txt）
+pip install -r requirements-lock.txt || pip install -r requirements.txt
+pip install pytest ruff bandit pip-audit pre-commit   # 开发期额外工具
+
+# 可选：安装 pre-commit 钩子，提交前自动跑 ruff / bandit（见「本地开发工具」）
+pre-commit install
+```
 
 # 本地打包（产出 dist/PenScope.exe）
 python make_icon.py          # 再生图标资源
 python build_nowrap.py       # PyInstaller 单文件构建
 ```
+
+> ⚠️ **构建平台限制**：`build_nowrap.py` 直接使用 Windows 原生模块 `nt`（用于绕过本机
+> safe-delete 沙箱对 `os.remove` 的拦截），因此**只能在 Windows 上运行**。在 Linux / macOS
+> 上会直接报错退出。CI 的发布任务已固定使用 `windows-latest` runner；本地构建也必须在
+> Windows 下进行。如需在其它平台打包，请改用标准 `pyinstaller PenScope.spec` 并自行处理
+> 沙箱拦截（不推荐，nt 还原逻辑正是为 Windows 沙箱环境设计的）。
 
 ## 2. 运行测试
 
@@ -42,12 +53,36 @@ python build_nowrap.py       # PyInstaller 单文件构建
 
 运行全量（本机、有显示时）：`python -m pytest -q`
 
+> CI 在 **ubuntu-latest + windows-latest** 双 runner 上运行上述纯逻辑测试，保证跨平台一致性。
+
 ## 3. 代码风格
 
 - 格式化 / Lint：`ruff check .`（可选 `ruff format .`）。
+- **`ruff` 已是 CI 硬门禁（测试同等级别必须通过）**：提交前务必本地跑一遍，避免 PR 被 CI 拦截。
 - 安全静态分析：`bandit -r scanner app_api.py`。
-- 依赖漏洞：`pip-audit -r requirements.txt`。
+- 依赖漏洞：`pip-audit -r requirements-lock.txt`。
 - 保持中文 / 英文界面字符串通过 `config` 与前端 i18n 资源维护，勿硬编码到逻辑中。
+
+### 3.1 本地开发工具（pre-commit）
+
+仓库根含 `.pre-commit-config.yaml`（ruff 检查 + 格式化、bandit 安全扫描）。安装后每次 `git commit` 自动执行：
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files   # 手动对全部文件执行
+```
+
+### 3.2 依赖锁文件（可复现构建）
+
+运行时依赖版本由 `requirements-lock.txt`（pip-compile 生成，含完整传递依赖与锁定版本）固定。更新依赖后请重新生成锁文件并提交：
+
+```bash
+pip install pip-tools
+pip-compile requirements.txt -o requirements-lock.txt   # Python 3.11 环境下执行
+```
+
+CI / 发布构建优先使用 `requirements-lock.txt`，失败时回退到 `requirements.txt`。
 
 ## 4. 提交 PR 流程
 

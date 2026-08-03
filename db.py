@@ -9,12 +9,12 @@
   而非立即失败，进一步提升多任务场景下数据完整性。
 读操作不加锁（WAL 下并发读安全），以保留吞吐。
 """
-import sqlite3
-import os
-import re
 import datetime
-import threading
 import json
+import re
+import sqlite3
+import threading
+
 from config import DB_PATH
 
 # 全局写锁：所有写事务串行执行，保证跨线程数据一致性（RLock 防止同线程重入死锁）
@@ -178,7 +178,6 @@ def init_db():
         "failure_detail TEXT",
     ]
     for col in _new_cols:
-        name = col.split()[0]
         try:
             c.execute(f"ALTER TABLE findings ADD COLUMN {col}")
         except sqlite3.OperationalError:
@@ -373,18 +372,6 @@ def capture_baseline(tid, snapshot):
     tid = int(tid)
     with _db_lock:
         c = _conn()
-        row = c.execute(
-            "SELECT fingerprint, title, headers, ports, subdomains, last_change, "
-            "captured_at, last_change_at FROM target_baseline WHERE target_id=?",
-            (tid,),
-        ).fetchone()
-        if row is None:
-            cur = {
-                "fingerprint": "", "title": "", "headers": "[]", "ports": "[]",
-                "subdomains": "[]", "last_change": "[]", "last_change_at": None,
-            }
-        else:
-            cur = dict(row)
         now = _now()
         sets = {"captured_at": now}
         for key in ("fingerprint", "title", "headers", "ports", "subdomains"):
@@ -674,7 +661,7 @@ def add_finding(scan_id, category, title, risk, detail, evidence, remediation, t
        证据等级更高、证据更详尽）。
     这样可根治「同一端口/同一注入点被多次报告」的问题，同时避免误删真正不同的发现。
     """
-    from cvss_dedup import cvss_for, finding_similarity, evidence_strength, finding_id_of
+    from cvss_dedup import cvss_for, evidence_strength, finding_id_of, finding_similarity
 
     if cvss_score is None or cvss_score == "":
         cvss_score, _vec = cvss_for(category, risk)
