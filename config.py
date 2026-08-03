@@ -18,7 +18,7 @@ APP_NAME = "PenScope"
 
 # 语义化版本号（MAJOR.MINOR.PATCH），展示给使用者；发布标签为 v<VERSION>
 # 规范：MAJOR=不兼容/重大架构变更；MINOR=向后兼容的功能新增；PATCH=向后兼容的问题修复。
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 # F-08：插件化框架总开关。关闭后不加载/运行任何插件扫描器（含内置示例）。
 ENABLE_PLUGINS = True

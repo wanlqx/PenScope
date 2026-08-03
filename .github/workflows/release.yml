@@ -5,7 +5,7 @@ name: Release PenScope
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
