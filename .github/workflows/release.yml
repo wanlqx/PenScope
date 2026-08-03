@@ -67,7 +67,7 @@ jobs:
 
       - name: Create GitHub Release (attach exe)
         if: steps.check.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: PenScope ${{ steps.ver.outputs.tag }}
