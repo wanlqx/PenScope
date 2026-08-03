@@ -54,7 +54,7 @@ print("ok:", r.get("ok"), "| html_len:", len(r.get("html", "")))
 
 print("\n== settings 默认/读写 ==")
 print("default:", api.get_settings())
-api.set_settings({"language": "en", "theme": "light", "font_size": "16", "layout": "compact"})
+api.set_settings({"language": "en", "theme": "light", "font_size": "16", "layout": "comfortable"})
 print("updated:", api.get_settings())
 
 print("\n== 发现去重 ==")
