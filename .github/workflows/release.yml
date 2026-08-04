@@ -53,7 +53,7 @@ jobs:
         id: ver
         shell: bash
         run: |
-          VER=$(python -c "import re;print(re.search(r'VERSION\s*=\s*\"(\d+\.\d+\.\d+)\"', open('config.py').read()).group(1))")
+          VER=$(python -c "import re;print(re.search(r'VERSION\s*=\s*\"(\d+\.\d+\.\d+)\"', open('config.py', encoding='utf-8').read()).group(1))")
           echo "version=$VER" >> "$GITHUB_OUTPUT"
           echo "tag=v$VER" >> "$GITHUB_OUTPUT"
 
