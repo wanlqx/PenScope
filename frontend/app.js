@@ -674,6 +674,8 @@
       _cmdIdx = 0; renderCmdList();
     });
     inp.addEventListener("keydown", function (e) {
+      // 面板打开（焦点在输入框）时 Ctrl/⌘+K 仍可切换关闭；全局快捷键在 INPUT 焦点下会 return，故在此单独处理
+      if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); closeCmdPalette(); return; }
       if (e.key === "ArrowDown") { e.preventDefault(); _cmdIdx = Math.min(_cmdIdx + 1, _cmdMatches.length - 1); renderCmdList(); }
       else if (e.key === "ArrowUp") { e.preventDefault(); _cmdIdx = Math.max(_cmdIdx - 1, 0); renderCmdList(); }
       else if (e.key === "Enter") { e.preventDefault(); runCmd(_cmdMatches[_cmdIdx]); }
@@ -693,7 +695,9 @@
     }).join("");
     box.querySelectorAll(".cmd-item").forEach(function (el) {
       el.addEventListener("mouseenter", function () {
-        _cmdIdx = parseInt(el.getAttribute("data-i"), 10); renderCmdList();
+        _cmdIdx = parseInt(el.getAttribute("data-i"), 10);
+        // 仅切换高亮，不重建整个列表：避免鼠标点击在 DOM 重建瞬间丢失（mousedown/mouseup 落在不同节点 → 不触发 click）
+        box.querySelectorAll(".cmd-item").forEach(function (x) { x.classList.toggle("active", x === el); });
       });
       el.addEventListener("click", function () { runCmd(_cmdMatches[parseInt(el.getAttribute("data-i"), 10)]); });
     });
@@ -831,6 +835,9 @@
     if (bell) bell.addEventListener("click", function () { navigate("#reviews"); });
     var bd = document.getElementById("ctx-backdrop");
     if (bd) bd.addEventListener("click", closeCtxPanel);
+    // 点击命令面板遮罩（面板外区域）关闭，修复"点了没反应、没法退出"
+    var cmdOv = document.getElementById("cmd-overlay");
+    if (cmdOv) cmdOv.addEventListener("click", function (e) { if (e.target === cmdOv) closeCmdPalette(); });
     // 初始化粒子网络动态背景 + 鼠标跟随按钮效果 + 鼠标拖尾（方案B 动态特效）
     // 主开关 fx_enabled：关闭后统一禁用所有动态/静态视觉效果（鼠标跟随、自定义光标、
     // 背景粒子、扫描线、暗角、噪点、按钮光晕），恢复系统原生外观。
@@ -2888,13 +2895,20 @@
     document.body.insertAdjacentHTML("beforeend", html);
     var hc = document.getElementById("kbd-help-close");
     if (hc) hc.addEventListener("click", function () { var e = document.getElementById("kbd-help"); if (e) e.remove(); });
+    // 点击遮罩（面板外区域）关闭快捷键帮助
+    var kbdOv = document.getElementById("kbd-help");
+    if (kbdOv) kbdOv.addEventListener("click", function (e) { if (e.target === kbdOv) kbdOv.remove(); });
   }
   function setupShortcuts() {
     document.addEventListener("keydown", function (e) {
       var tag = (e.target && e.target.tagName) || "";
       if (/^(INPUT|SELECT|TEXTAREA)$/.test(tag) || (e.target && e.target.isContentEditable)) return;
       if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
-        e.preventDefault(); toggleShortcutHelp(); return;
+        e.preventDefault();
+        var _ov = document.getElementById("cmd-overlay");
+        if (_ov && !_ov.classList.contains("hidden")) closeCmdPalette();
+        else openCmdPalette();
+        return;
       }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (_gotoPending) {
