@@ -47,6 +47,16 @@ _STATIC_EXT = (
     ".xml", ".webmanifest",
 )
 
+# 响应正文出现这些标志时，说明访问实际已被拒绝或要求登录，应排除"未授权访问"误报
+_DENIED_MARKERS = (
+    "unauthorized", "forbidden", "access denied", "access is denied",
+    "not authorized", "please login", "please log in", "login required",
+    "authentication required", "requires authentication", "sign in",
+    "permission denied", "not permitted",
+    "需要登录", "请登录", "无权限", "没有权限", "拒绝访问", "未授权",
+    "登录后", "请先登录", "权限不足", "鉴权失败",
+)
+
 # 权限指示参数（潜在 IDOR / 越权）：标识用户身份/权限的字段名
 _PRIV_PARAM_RE = re.compile(
     r"(?i)\b(role|admin|root|uid|userid|user_id|level|priv|privilege|"
@@ -116,6 +126,10 @@ def scan_access_control(url, session, timeout=6.0, verify_ssl=True, probe_sessio
         text = r.text or ""
         # 软 404：正文与基线高度相似（自定义 404 返回 200）= 排除
         if baseline_text and _similarity(text, baseline_text) > 0.85:
+            continue
+        # 访问已被拒绝或要求登录：排除"未授权访问"误报
+        low_text = text.lower()
+        if any(d in low_text for d in _DENIED_MARKERS):
             continue
         if (target, "forced_browsing") in seen:
             continue

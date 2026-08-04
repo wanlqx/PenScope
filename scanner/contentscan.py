@@ -128,16 +128,6 @@ def scan_content(base_url, session, timeout=6.0, verify_ssl=True, paths=None):
                     verification_status="unverified", evidence_level="L2",
                     poc=f"curl -I '{url}'",
                 ))
-            elif status in (403, 401, 405, 500) and is_sens:
-                findings.append(_mk(
-                    "目录暴露", f"敏感路径存在但受限：{url}", "Low",
-                    f"请求返回 {status}，提示该敏感路径存在（虽当前受限），建议确认是否为预期。",
-                    f"status={status}",
-                    "确认该路径用途；若为遗留/调试入口应移除；对管理类路径加强认证与来源限制。",
-                    url, cwe="CWE-548", endpoint=url, http_method="GET",
-                    verification_status="unverified", evidence_level="L2",
-                    poc=f"curl -I '{url}'",
-                ))
             elif status == 200 and _RE_DIRINDEX.search(body):
                 findings.append(_mk(
                     "目录暴露", f"目录列表开启：{url}", "Low",

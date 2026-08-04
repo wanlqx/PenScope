@@ -147,12 +147,20 @@ def test_ssrf_param_regex():
     print("PASS test_ssrf_param_regex")
 
 
+def test_ssrf_metadata_echo_fp():
+    # 响应仅回显请求 URL（含 latest/meta-data 路径）不应被当作云元数据证据
+    echo = "search result for http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+    assert _detect_metadata(echo) is None, f"URL 回显不应被判定为元数据：{_detect_metadata(echo)}"
+    print("PASS test_ssrf_metadata_echo_fp")
+
+
 if __name__ == "__main__":
     test_traversal_detect_helper()
     test_traversal_positive()
     test_traversal_fp_avoid()
     test_traversal_no_marker()
     test_ssrf_param_regex()
+    test_ssrf_metadata_echo_fp()
     test_ssrf_file_hit()
     test_ssrf_metadata_hit()
     test_ssrf_sink_only()

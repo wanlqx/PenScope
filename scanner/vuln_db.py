@@ -44,11 +44,11 @@ KNOWN_VULNS = [
     {
         "service": "nginx",
         "pattern": r"nginx/([\d.]+)",
-        "vuln_versions": ["0.", "1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15", "1.16", "1.17", "1.18", "1.19", "1.20"],
+        "vuln_versions": ["0.", "1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "1.7", "1.8", "1.9", "1.10", "1.11", "1.12", "1.13", "1.14", "1.15", "1.16", "1.17"],
         "risk": "Medium",
-        "cve": "CVE-2019-9511 等",
-        "detail": "部分旧版 nginx 存在请求走私 / 拒绝服务风险。",
-        "remediation": "升级至 nginx 1.22+ 稳定版。",
+        "cve": "CVE-2019-9511 / CVE-2019-9513 等（HTTP/2 拒绝服务）",
+        "detail": "nginx 1.9.5–1.17.2 等旧版存在 HTTP/2 拒绝服务 / 请求走私风险；1.18.0 及以后版本已修复相关 CVE。",
+        "remediation": "如版本低于 1.18，升级至 nginx 1.22+ 稳定版；1.18+ 无需因此 CVE 升级。",
     },
     {
         "service": "Redis",
@@ -73,6 +73,24 @@ KNOWN_VULNS = [
 import re
 
 
+def _version_match(version, prefix):
+    """语义版本前缀匹配：'1.17' 匹配 '1.17.2'，但不匹配 '1.18.0' 或 '1.21.0'。
+    解决字符串 startswith 把 '1.2' 同时命中 '1.2.0' 与 '1.21.0' 的误报问题。
+    """
+    if not version or not prefix:
+        return version.startswith(prefix) if prefix else True
+    try:
+        vp = [int(x) for x in version.split(".") if x.isdigit()]
+        pp = [int(x) for x in prefix.split(".") if x.isdigit()]
+    except Exception:
+        return version.startswith(prefix)
+    if not pp:
+        return True
+    if len(vp) < len(pp):
+        return False
+    return vp[:len(pp)] == pp
+
+
 def match_vulns(service_name, banner):
     """依据服务名与 banner 匹配已知漏洞，返回命中列表。"""
     hits = []
@@ -86,7 +104,7 @@ def match_vulns(service_name, banner):
             is_vuln = False
             if entry["vuln_versions"]:
                 for v in entry["vuln_versions"]:
-                    if version.startswith(v):
+                    if _version_match(version, v):
                         is_vuln = True
                         break
             else:

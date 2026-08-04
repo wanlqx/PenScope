@@ -108,8 +108,16 @@ def test_match_vulns_patched_version_not_flagged():
 
 
 def test_match_vulns_nginx_old_flagged():
-    hits = vuln_db.match_vulns("", "nginx/1.21.0")
+    # 1.17.x 属于 CVE-2019-9511 影响范围，应命中
+    hits = vuln_db.match_vulns("", "nginx/1.17.2")
     assert any(h["service"] == "nginx" for h in hits)
+
+
+def test_match_vulns_nginx_patched_not_flagged():
+    # 1.18.0 及以后已修复 CVE-2019-9511，不应告警
+    assert vuln_db.match_vulns("", "nginx/1.18.0") == []
+    assert vuln_db.match_vulns("", "nginx/1.21.0") == []
+    assert vuln_db.match_vulns("", "nginx/1.21.6") == []
 
 
 def test_match_vulns_empty_banner_no_hits():

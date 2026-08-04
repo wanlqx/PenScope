@@ -37,8 +37,12 @@ _META_PAYLOADS = [
 
 # 云元数据响应特征
 _META_MARKERS = (
+    # JSON 格式元数据响应（IMDS 部分接口返回 JSON）
     '"instance-id"', '"ami-id"', '"local-ipv4"', '"public-ipv4"',
-    '"instance-type"', 'latest/meta-data', 'security-credentials',
+    '"instance-type"',
+    # 纯文本格式元数据响应（IMDS v1 默认返回字段名列表）
+    "instance-id", "ami-id", "local-ipv4", "public-ipv4",
+    "instance-type", "availability-zone", "accountId", "privateIp",
 )
 
 
