@@ -35,7 +35,7 @@ _META_PAYLOADS = [
     "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
 ]
 
-# 云元数据响应特征
+# 云元数据响应特征（需多特征同时出现才判定为高置信度）
 _META_MARKERS = (
     # JSON 格式元数据响应（IMDS 部分接口返回 JSON）
     '"instance-id"', '"ami-id"', '"local-ipv4"', '"public-ipv4"',
@@ -44,6 +44,49 @@ _META_MARKERS = (
     "instance-id", "ami-id", "local-ipv4", "public-ipv4",
     "instance-type", "availability-zone", "accountId", "privateIp",
 )
+
+# 高置信度元数据判定：至少命中 N 个不同特征（防止单关键词 URL 回显误报）
+_META_MIN_HITS = 2
+
+# 响应正文含这些标志时为错误页（非真实元数据），应排除
+_ERROR_PAGE_MARKERS = (
+    "404", "not found", "找不到", "文件或目录", "bad request",
+    "forbidden", "error", "exception", "服务器错误", "内部错误",
+    "gateway", "timeout", "unavailable",
+)
+
+# 基线探针（与 access_control.py / contentscan.py 对齐）
+_SSRF_BASELINE_NONCE = "_ssrf_probe_nonexistent_4D1C"
+
+
+def _similarity(a, b):
+    """基于 token Jaccard 的文本相似度（0~1），用于识别软 404。"""
+    if not a or not b:
+        return 0.0
+    import re as _re
+    sa = set(_re.findall(r"[a-z0-9一-鿿]+", a.lower()))
+    sb = set(_re.findall(r"[a-z0-9一-鿿]+", b.lower()))
+    if not sa and not sb:
+        return 1.0
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
+
+def _count_meta_markers(text):
+    """统计响应体中命中的元数据特征数量。"""
+    if not text:
+        return 0
+    low = text.lower()
+    return sum(1 for m in _META_MARKERS if m.lower() in low)
+
+
+def _is_error_page(text):
+    """判断响应是否为错误页（非真实内容）。"""
+    if not text:
+        return True
+    low = text.lower()
+    return any(m in low for m in _ERROR_PAGE_MARKERS)
 
 
 def _detect_file_content(text):
@@ -75,7 +118,14 @@ def _url_param_points(url):
 
 
 def scan_ssrf(url, session, timeout=6.0, verify_ssl=True):
-    """SSRF 只读响应检测：注入 file:// 与云元数据地址做强证据判定，并对 URL 类参数给出注入点观察。"""
+    """SSRF 只读响应检测：注入 file:// 与云元数据地址做强证据判定，并对 URL 类参数给出注入点观察。
+
+    降噪（v1.1+）：
+      ① 仅 200 响应参与强证据判定（404/403/502 等不可能是真实文件/元数据泄露）
+      ② 基线 404 相似度比对（排除软 404 回显 URL 的误报）
+      ③ 元数据需 ≥2 个特征同时出现（防止单关键词 URL 回显误报）
+      ④ 错误页关键词排除（含 404/not found/forbidden 等自动降级）
+    """
     findings = []
     forms = discover(url, session, timeout, verify_ssl)
     points = list(_url_param_points(url))
@@ -85,6 +135,18 @@ def scan_ssrf(url, session, timeout=6.0, verify_ssl=True):
             points.append((f["action"], f["method"], field, f["fields"]))
     if not points:
         return findings
+
+    # —— 基线 404 探针（与 access_control.py / contentscan.py 对齐）——
+    from urllib.parse import urlunparse, urlparse as _uparse
+    parsed = _uparse(url)
+    root = urlunparse((parsed.scheme, parsed.netloc, "/", "", "", ""))
+    baseline_text = ""
+    try:
+        r0 = session.get(root + _SSRF_BASELINE_NONCE, timeout=timeout,
+                        verify=verify_ssl, allow_redirects=False)
+        baseline_text = (r0.text or "") if r0.status_code == 200 else ""
+    except Exception:
+        baseline_text = ""
 
     seen_hit = set()
     seen_sink = set()
@@ -99,9 +161,19 @@ def scan_ssrf(url, session, timeout=6.0, verify_ssl=True):
                 r = _send_form(session, target, method, fields, p, payload, timeout, verify_ssl)
             except requests.RequestException:
                 continue
-            m = _detect_file_content(r.text)
+            # ① 仅 200 响应才可能是真实文件内容泄露
+            if r.status_code != 200:
+                continue
+            text = r.text or ""
+            # ② 排除错误页（200 但含 404/not found 等关键词）
+            if _is_error_page(text):
+                continue
+            # ③ 软 404 排除：与基线高度相似
+            if baseline_text and _similarity(text, baseline_text) > 0.85:
+                continue
+            m = _detect_file_content(text)
             if m:
-                file_hit = (m, payload, (r.text or "")[:200])
+                file_hit = (m, payload, text[:200])
                 break
         if file_hit:
             marker, payload, evidence = file_hit
@@ -127,17 +199,31 @@ def scan_ssrf(url, session, timeout=6.0, verify_ssl=True):
                 r = _send_form(session, target, method, fields, p, payload, timeout, verify_ssl)
             except requests.RequestException:
                 continue
-            m = _detect_metadata(r.text)
+            # ① 仅 200 响应才可能是真实元数据泄露（404/403/502 不可能）
+            if r.status_code != 200:
+                continue
+            text = r.text or ""
+            # ② 排除错误页
+            if _is_error_page(text):
+                continue
+            # ③ 软 404 排除：与基线高度相似 → URL 回显在错误页中
+            if baseline_text and _similarity(text, baseline_text) > 0.85:
+                continue
+            # ④ 需 ≥2 个不同元数据特征同时出现（防止单关键词 URL 回显误报）
+            if _count_meta_markers(text) < _META_MIN_HITS:
+                continue
+            m = _detect_metadata(text)
             if m:
-                meta_hit = (m, payload, (r.text or "")[:200])
+                meta_hit = (m, payload, text[:200], _count_meta_markers(text))
                 break
         if meta_hit:
-            marker, payload, evidence = meta_hit
+            marker, payload, evidence, marker_count = meta_hit
             seen_hit.add((target, method, p))
             findings.append(_mk(
                 "SSRF", f"参数 '{p}' 疑似 SSRF 命中云实例元数据端点", "High",
-                f"向参数 {p}（端点 {target}，方法 {method.upper()}）注入云元数据地址后，响应出现元数据特征"
-                f"（{marker!r}），可能泄露云凭证/实例信息（CWE-918）。需人工确认目标是否位于云环境且未隔离元数据服务。",
+                f"向参数 {p}（端点 {target}，方法 {method.upper()}）注入云元数据地址后，"
+                f"响应 200 且出现 {marker_count} 个元数据特征（含 {marker!r}），"
+                f"可能泄露云凭证/实例信息（CWE-918）。需人工确认目标是否位于云环境且未隔离元数据服务。",
                 evidence.replace("\n", " ")[:200],
                 "云环境实例元数据服务（169.254.169.254）应通过网络策略/IMDSv2 隔离，禁止从应用层转发；"
                 "对 URL 参数做严格的协议与域名白名单，禁止访问链路本地（169.254.x）与内网地址。",

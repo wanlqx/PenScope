@@ -57,6 +57,14 @@ _DENIED_MARKERS = (
     "登录后", "请先登录", "权限不足", "鉴权失败",
 )
 
+# JS 客户端重定向模式：部分应用用 JS（而非 HTTP 30x）跳转登录页
+# 匹配 window.location / parent.location / top.location 赋值（绝对或相对 URL）
+_RE_JS_REDIRECT = re.compile(
+    r'window\.(?:location|parent\.location|top\.location)\s*[\.\w]*\s*=\s*'
+    r'[\'"]?(?:https?://[^\'"\s]*|/[^\'"\s]*(?:login|signin|auth|account)[^\'"\s]*)',
+    re.IGNORECASE,
+)
+
 # 权限指示参数（潜在 IDOR / 越权）：标识用户身份/权限的字段名
 _PRIV_PARAM_RE = re.compile(
     r"(?i)\b(role|admin|root|uid|userid|user_id|level|priv|privilege|"
@@ -139,6 +147,9 @@ def scan_access_control(url, session, timeout=6.0, verify_ssl=True, probe_sessio
         # 访问已被拒绝或要求登录：排除"未授权访问"误报
         low_text = text.lower()
         if any(d in low_text for d in _DENIED_MARKERS):
+            continue
+        # JS 客户端重定向到登录页：应用用 JS（而非 HTTP 30x）做认证跳转，实际受保护
+        if _RE_JS_REDIRECT.search(text):
             continue
         if (target, "forced_browsing") in seen:
             continue
