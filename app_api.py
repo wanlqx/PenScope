@@ -416,6 +416,38 @@ class Api:
         audit(_OPERATOR, "scan_delete", f"scan#{sid}", "删除扫描任务及其发现（可撤销）", "")
         return _ok({"undo_token": token})
 
+    def delete_scans(self, ids):
+        """批量删除扫描任务（复用 trash 快照 + 撤销机制）。返回删除数量与撤销令牌列表。"""
+        if not ids or not isinstance(ids, list):
+            return _err("E_INVALID", "未提供要删除的扫描")
+        undos = []
+        removed = 0
+        for sid in ids:
+            try:
+                sid = int(sid)
+            except (TypeError, ValueError):
+                continue
+            if not get_scan(sid):
+                continue
+            token = trash_scan(sid)
+            if token:
+                undos.append(token)
+                removed += 1
+        if removed == 0:
+            return _err("E_NOT_FOUND", "没有可删除的扫描")
+        audit(_OPERATOR, "scan_delete_batch", "", f"批量删除 {removed} 个扫描任务（可撤销）", "")
+        return _ok({"removed": removed, "undos": undos})
+
+    def undo_deletes(self, tokens):
+        """批量还原被删除的目标 / 扫描 / 定时任务（撤销窗口内）。"""
+        if not tokens or not isinstance(tokens, list):
+            return _err("E_INVALID", "未提供撤销令牌")
+        ok_n = 0
+        for tk in tokens:
+            if restore_trash(tk):
+                ok_n += 1
+        return _ok({"restored": ok_n})
+
     # ---------------- 人工复核闸门 ----------------
     def list_reviews(self):
         return pending_reviews()

@@ -196,6 +196,8 @@ details.authcfg textarea{min-height:54px}
 
 /* 数据归档（P-04） */
 .chk{font-size:13px;color:var(--muted);cursor:pointer;user-select:none}
+.col-chk{width:34px;text-align:center}
+.col-chk input[type=checkbox],.chk input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;vertical-align:middle;cursor:pointer}
 .arch-row{opacity:.7}
 .badge.arch{background:var(--muted);color:#fff;font-size:11px;padding:1px 6px;border-radius:8px;margin-left:4px}
 

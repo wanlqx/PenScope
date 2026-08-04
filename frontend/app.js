@@ -165,7 +165,8 @@
   // U-03 操作可撤销：删除成功后弹出带「撤销」的提示，5 秒窗口内可还原。
   function toastUndo(r, doneMsg, onDone) {
     if (!r.ok) { toast(r.error || (settings.language === "en" ? "Failed" : "操作失败"), "err"); return; }
-    if (!r.undo_token) { toast(doneMsg, "ok"); if (onDone) onDone(); return; }
+    var undos = r.undos || (r.undo_token ? [r.undo_token] : null);
+    if (!undos || !undos.length) { toast(doneMsg, "ok"); if (onDone) onDone(); return; }
     var d = document.createElement("div");
     d.className = "flash";
     d.style.position = "fixed";
@@ -182,7 +183,7 @@
     }, 5000);
     d.querySelector("#undo-btn").addEventListener("click", function () {
       if (done) return; done = true; clearTimeout(timer);
-      call("undo_delete", r.undo_token).then(function (ur) {
+      call("undo_deletes", undos).then(function (ur) {
         d.remove();
         if (ur.ok) toast(settings.language === "en" ? "Undone" : "已撤销", "ok");
         else toast(ur.error || (settings.language === "en" ? "Undo failed" : "撤销失败"), "err");
@@ -621,8 +622,8 @@
     if (recent.length) {
       html += '<table><thead><tr><th>#</th><th>' + esc(t("name")) + '</th><th>' + esc(t("status")) +
         '</th><th>' + esc(t("stage")) + '</th><th></th></tr></thead><tbody>';
-      recent.forEach(function (s) {
-        html += '<tr><td>' + s.id + '</td><td>' + esc(s.name) + '</td><td>' + stageTag(s.status) +
+      recent.forEach(function (s, i) {
+        html += '<tr><td>' + (i + 1) + '</td><td>' + esc(s.name) + '</td><td>' + stageTag(s.status) +
           '</td><td>' + esc(s.stage || "") + '</td><td><a class="btn sm" href="#scan/' + s.id + '">' +
           (en ? "Detail" : "详情") + '</a></td></tr>';
       });
@@ -1114,8 +1115,8 @@
         html += '<div class="card"><h2 style="margin:0 0 10px">' + t("recentScans") + '</h2>';
         if (scans.length) {
           html += '<table><thead><tr><th>#</th><th>' + t("name") + '</th><th>' + t("targetId") + '</th><th>' + t("status") + '</th><th>' + t("stage") + '</th><th></th></tr></thead><tbody>';
-          scans.forEach(function (s) {
-            html += '<tr><td>' + s.id + '</td><td>' + esc(s.name) + '</td><td>' + s.target_id +
+          scans.forEach(function (s, i) {
+            html += '<tr><td>' + (i + 1) + '</td><td>' + esc(s.name) + '</td><td>' + s.target_id +
               '</td><td>' + stageTag(s.status) + '</td><td>' + esc(s.stage || "") +
               '</td><td><a class="btn sm" href="#scan/' + s.id + '">' + (settings.language === "en" ? "Detail" : "详情") + '</a></td></tr>';
           });
@@ -1431,12 +1432,12 @@
           html += '<button class="btn ghost sm" id="tc-arch90" title="' + t("archive90Hint") + '">' + t("archive90") + '</button>';
           if (scans.length) {
             html += '<table><thead><tr><th>#</th><th>' + t("name") + '</th><th>' + t("status") + '</th><th>' + t("stage") + '</th><th>' + t("finishedAt") + '</th><th></th></tr></thead><tbody>';
-            scans.slice(0, 15).forEach(function (s) {
+            scans.slice(0, 15).forEach(function (s, i) {
               var archived = (s.archived == 1);
               var archBtn = archived
                 ? '<button class="btn sm ghost" data-arch="' + s.id + '" data-val="0">' + t("unarchive") + '</button>'
                 : '<button class="btn sm ghost" data-arch="' + s.id + '" data-val="1">' + t("archive") + '</button>';
-              html += '<tr' + (archived ? ' class="arch-row"' : '') + '><td>' + s.id + (archived ? ' <span class="badge arch">' + t("archived") + '</span>' : '') + '</td><td>' + esc(s.name) + '</td><td>' + stageTag(s.status) + '</td><td>' + esc(s.stage || "") + '</td><td class="muted">' + esc(s.finished_at || "-") + '</td>' +
+              html += '<tr' + (archived ? ' class="arch-row"' : '') + '><td>' + (i + 1) + (archived ? ' <span class="badge arch">' + t("archived") + '</span>' : '') + '</td><td>' + esc(s.name) + '</td><td>' + stageTag(s.status) + '</td><td>' + esc(s.stage || "") + '</td><td class="muted">' + esc(s.finished_at || "-") + '</td>' +
                 '<td><a class="btn sm" href="#scan/' + s.id + '">' + dtl + '</a> ' + archBtn + '</td></tr>';
             });
             html += '</tbody></table>';
@@ -1545,18 +1546,22 @@
   // ---------------- 扫描任务 ----------------
   function renderScans() {
     call("list_scans", 50).then(function (scans) {
-      var html = '<h1>' + t("scans") + '</h1><div class="card"><table>' +
-        '<thead><tr><th>#</th><th>' + t("name") + '</th><th>' + t("targetId") + '</th><th>' + t("status") + '</th><th>' + t("stage") + '</th><th>' + t("createdBy") + '</th><th></th></tr></thead><tbody>';
+      var html = '<h1>' + t("scans") + '</h1>' +
+        '<div class="toolbar scan-bar"><label class="chk"><input type="checkbox" id="scan-selall"> ' + t("selectAll") + '</label>' +
+        '<button class="btn danger" id="scan-batchdel" disabled>' + t("batchDelete") + ' (<span id="scan-selcnt">0</span>)</button></div>' +
+        '<div class="card"><table>' +
+        '<thead><tr><th class="col-chk"></th><th>#</th><th>' + t("name") + '</th><th>' + t("targetId") + '</th><th>' + t("status") + '</th><th>' + t("stage") + '</th><th>' + t("createdBy") + '</th><th></th></tr></thead><tbody>';
       if (scans.length) {
-        scans.forEach(function (s) {
-          html += '<tr><td>' + s.id + '</td><td>' + esc(s.name) + '</td><td>' + s.target_id + '</td><td>' +
+        scans.forEach(function (s, i) {
+          html += '<tr><td class="col-chk"><input type="checkbox" class="scan-chk" value="' + s.id + '"></td>' +
+            '<td>' + (i + 1) + '</td><td>' + esc(s.name) + '</td><td>' + s.target_id + '</td><td>' +
             stageTag(s.status) + '</td><td>' + esc(s.stage || "") + '</td><td>' + esc(s.created_by) +
             '</td><td><a class="btn sm" href="#scan/' + s.id + '">' + (settings.language === "en" ? "Detail" : "详情") + '</a>' +
             (s.status === "completed" ? ' <a class="btn sm ghost" href="#scan/' + s.id + '" data-report="' + s.id + '">' + t("report") + '</a>' : "") +
             ' <button class="btn sm danger" data-del-scan="' + s.id + '">' + t("delete") + '</button>' +
             '</td></tr>';
         });
-      } else html += '<tr><td colspan="7" class="muted" style="text-align:center">' + t("noData") + '</td></tr>';
+      } else html += '<tr><td colspan="8" class="muted" style="text-align:center">' + t("noData") + '</td></tr>';
       html += "</tbody></table></div>";
       paintView(html);
       view().querySelectorAll("[data-report]").forEach(function (a) {
@@ -1569,6 +1574,32 @@
             call("delete_scan", parseInt(sid, 10)).then(function (r) {
               toastUndo(r, t("deleted"), renderScans);
             });
+          });
+        });
+      });
+      // —— 批量删除：多选 + 全选 + 批量删除按钮 ——
+      var chks = view().querySelectorAll(".scan-chk");
+      var selall = document.getElementById("scan-selall");
+      var batchBtn = document.getElementById("scan-batchdel");
+      var cntEl = document.getElementById("scan-selcnt");
+      function syncSel() {
+        var n = view().querySelectorAll(".scan-chk:checked").length;
+        if (cntEl) cntEl.textContent = n;
+        if (batchBtn) batchBtn.disabled = n === 0;
+        if (selall) selall.checked = n > 0 && n === chks.length;
+      }
+      chks.forEach(function (c) { c.addEventListener("change", syncSel); });
+      if (selall) selall.addEventListener("change", function () {
+        chks.forEach(function (c) { c.checked = selall.checked; }); syncSel();
+      });
+      if (batchBtn) batchBtn.addEventListener("click", function () {
+        var ids = [];
+        view().querySelectorAll(".scan-chk:checked").forEach(function (c) { ids.push(parseInt(c.value, 10)); });
+        if (!ids.length) return;
+        confirmDialog(t("batchDelete"), t("confirmDeleteScans").replace("{n}", ids.length), function () {
+          call("delete_scans", ids).then(function (r) {
+            if (!r.ok) { toast(r.error || (settings.language === "en" ? "Failed" : "操作失败"), "err"); return; }
+            toastUndo(r, t("deleted") + (r.removed ? " · " + r.removed : ""), renderScans);
           });
         });
       });
