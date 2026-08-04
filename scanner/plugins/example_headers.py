@@ -1,7 +1,7 @@
 """F-08 内置示例插件：被动安全响应头检测。
 
 演示第三方扫描器如何借助 BaseScanner 接入流水线：
-- 仅做被动 GET 并检查响应头；
+- 跟随重定向到最终内容页后检查响应头（避免在 302 上误报缺 HSTS）；
 - 缺失 HSTS / X-Content-Type-Options 时产出 Info 级发现；
 - 零写入、零误报风险，用于验证插件框架端到端可用。
 二次开发者可复制本文件结构编写自己的插件。注意：外部插件默认处于「严格信任」模式，
@@ -27,7 +27,10 @@ class ExampleSecurityHeadersScanner(BaseScanner):
         if not url:
             return
         try:
-            r = ctx.session.get(url, timeout=8, verify=ctx.verify_ssl, allow_redirects=False)
+            # allow_redirects=True：跟随重定向到最终内容页再检查头。
+            # 若用 False，在 http→https 的 302 响应上检查会误报"缺 HSTS"
+            # （302 响应本身不含 HSTS，但最终 https 页面可能已配置）。
+            r = ctx.session.get(url, timeout=8, verify=ctx.verify_ssl, allow_redirects=True)
         except Exception as e:
             ctx.audit("plugin_err", url, f"示例插件请求失败: {e}")
             return

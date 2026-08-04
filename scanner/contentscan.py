@@ -69,6 +69,45 @@ _RE_DIRINDEX = re.compile(r'(<title>\s*index of|directory listing for|ftp listin
 
 _READ_LIMIT = 65536  # 单次 GET 最多读取 64KB 用于内容判定
 
+# —— 软 404 / 访问拒绝降噪（与 access_control.py 对齐）——
+
+# 响应正文出现这些标志时，说明访问实际已被拒绝或要求登录，应排除误报
+_DENIED_MARKERS = (
+    "unauthorized", "forbidden", "access denied", "access is denied",
+    "not authorized", "please login", "please log in", "login required",
+    "authentication required", "requires authentication", "sign in",
+    "permission denied", "not permitted",
+    "需要登录", "请登录", "无权限", "没有权限", "拒绝访问", "未授权",
+    "登录后", "请先登录", "权限不足", "鉴权失败",
+)
+
+# 本就应对外公开的路径（登录入口/公开资源），命中时不报"缺失授权"
+_PUBLIC_PATHS = frozenset({
+    "/login", "/admin/login", "/wp-admin", "/wp-login.php",
+    "/user", "/users", "/account", "/profile", "/settings",
+    "/robots.txt", "/sitemap.xml", "/crossdomain.xml",
+    "/.well-known/security.txt",
+})
+
+# .env 类路径的正文特征：真正的环境文件应含 KEY=VALUE 格式行
+_RE_ENV_LIKE = re.compile(
+    r'^[A-Z_][A-Z0-9_]*\s*=\s*[\'"]?[^\s\'"=]+', re.MULTILINE)
+
+_BASELINE_NONCE = "_cs_probe_nonexistent_7B2E"
+
+
+def _similarity(a, b):
+    """基于 token Jaccard 的文本相似度（0~1），用于识别软 404。与 access_control.py 同款。"""
+    if not a or not b:
+        return 0.0
+    sa = set(re.findall(r"[a-z0-9一-鿿]+", a.lower()))
+    sb = set(re.findall(r"[a-z0-9一-鿿]+", b.lower()))
+    if not sa and not sb:
+        return 1.0
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
 
 def _read_body(r):
     """以 stream 方式限长读取响应体，避免下载大文件。"""
@@ -96,9 +135,34 @@ def _classify_path(url):
 
 
 def scan_content(base_url, session, timeout=6.0, verify_ssl=True, paths=None):
-    """对 base_url 所在主机做目录/敏感信息被动扫描。仅只读 GET/HEAD。"""
+    """对 base_url 所在主机做目录/敏感信息被动扫描。仅只读 GET/HEAD。
+
+    四重降噪（v1.1+ 对齐 access_control.py）：
+      ① 基线 404 探针 + Jaccard 相似度（排除软 404 返回 200 的误报）
+      ② 拒绝关键词过滤（排除 200 + "请登录/forbidden" 的软拒绝页）
+      ③ 公开路径白名单（/login 等本就公开的路径不报未授权）
+      ④ .env 类路径正文特征验证（真正的环境文件应含 KEY=VALUE 格式）
+    """
+    import requests
+    from urllib.parse import urlunparse, urlparse
+
     findings = []
     paths = paths or _PATH_WORDLIST
+
+    # 解析主机根 URL（用于基线探针）
+    parsed = urlparse(base_url)
+    root = urlunparse((parsed.scheme, parsed.netloc, "/", "", "", ""))
+
+    # —— ① 基线 404 探针：获取"确定不存在"路径的响应作为软 404 比对基准 ——
+    baseline_text = ""
+    try:
+        probe_sess = requests.Session()
+        probe_sess.headers.update({"User-Agent": "PenScope/1.0 (authorized security test)"})
+        r0 = probe_sess.get(root + _BASELINE_NONCE, timeout=timeout,
+                            verify=verify_ssl, allow_redirects=False)
+        baseline_text = r0.text or ""
+    except Exception:
+        baseline_text = ""
 
     for p in paths:
         url = urljoin(base_url, p).split("#")[0]
@@ -116,20 +180,56 @@ def scan_content(base_url, session, timeout=6.0, verify_ssl=True, paths=None):
 
             # —— 目录/文件暴露（存在性）——
             is_sens = _classify_path(url)
-            if status == 200 and is_sens:
-                findings.append(_mk(
-                    "目录暴露", f"敏感路径可访问：{url}", "Medium" if is_sens else "Low",
-                    "目标存在可被直接访问的敏感路径（配置/密钥/备份/版本控制/信息泄露端点），"
-                    "可能泄露凭据或系统细节。",
-                    f"status=200 content-type={ctype[:40]} bytes={len(body)}",
-                    "将该类路径移出 Web 根目录或限制访问来源（IP/认证）；禁止在 Web 可访问位置存放"
-                    "密钥与备份；关闭目录列表。",
-                    url, cwe="CWE-538", endpoint=url, http_method="GET",
-                    verification_status="unverified", evidence_level="L2",
-                    poc=f"curl -I '{url}'",
-                ))
+
+            # ③ 公开路径白名单：登录页等本就应对外公开，跳过"未授权"类报告
+            #    （但仍保留后续的敏感信息泄露正则扫描，因为登录页也可能泄露信息）
+            is_public = p in _PUBLIC_PATHS
+
+            if status == 200 and is_sens and not is_public:
+                # ① 软 404 排除：与基线高度相似 → 应用对不存在路径返回了通用 200 页
+                if baseline_text and _similarity(body, baseline_text) > 0.85:
+                    pass  # 软 404，不报
+                # ② 拒绝关键词排除：200 但正文含"请登录/forbidden"等
+                elif any(d in body.lower() for d in _DENIED_MARKERS):
+                    pass  # 软拒绝页，不报
+                else:
+                    # ④ .env 类路径额外验证正文是否像环境文件（含 KEY=VALUE 行）
+                    path_lower = url.lower()
+                    is_env_like = any(kw in path_lower for kw in (".env", ".config", "config.",
+                                                                   "application.", "settings."))
+                    if is_env_like and not _RE_ENV_LIKE.search(body):
+                        # 路径像配置文件但正文不含 KEY=VALUE 格式，降级为低危观察
+                        findings.append(_mk(
+                            "目录暴露", f"敏感路径响应异常（疑似软 404）：{url}", "Low",
+                            f"路径 {url} 返回 200 但正文不像真实配置/环境文件内容"
+                            f"（无 KEY=VALUE 格式），可能是应用框架的 catch-all 错误页。",
+                            f"status=200 content-type={ctype[:40]} bytes={len(body)} "
+                            f"[正文非配置格式，需人工确认]",
+                            "确认该路径返回的是否为真实敏感内容；若为错误页则忽略；"
+                            "否则将配置文件移出 Web 可访问位置。",
+                            url, cwe="CWE-538", endpoint=url, http_method="GET",
+                            verification_status="unverified", evidence_level="L1",
+                            poc=f"curl '{url}'",
+                        ))
+                    else:
+                        # 通过全部降噪：正文确实异于基线、无拒绝词、(env 类路径) 含配置特征
+                        findings.append(_mk(
+                            "目录暴露", f"敏感路径可访问：{url}", "Medium" if is_sens else "Low",
+                            "目标存在可被直接访问的敏感路径（配置/密钥/备份/版本控制/信息泄露端点），"
+                            "可能泄露凭据或系统细节。",
+                            f"status=200 content-type={ctype[:40]} bytes={len(body)}",
+                            "将该类路径移出 Web 根目录或限制访问来源（IP/认证）；禁止在 Web 可访问位置存放"
+                            "密钥与备份；关闭目录列表。",
+                            url, cwe="CWE-538", endpoint=url, http_method="GET",
+                            verification_status="unverified", evidence_level="L2",
+                            poc=f"curl -I '{url}'",
+                        ))
             elif status == 200 and _RE_DIRINDEX.search(body):
-                findings.append(_mk(
+                # 目录列表也做软 404 排除（避免 catch-all 路由的 200 页误报）
+                if baseline_text and _similarity(body, baseline_text) > 0.85:
+                    pass  # 与基线太像，不是真正的目录列表
+                else:
+                    findings.append(_mk(
                     "目录暴露", f"目录列表开启：{url}", "Low",
                     "目标开启了目录列表（Index of），可浏览目录下文件，可能泄露备份/源码等。",
                     "status=200 命中目录列表标识",

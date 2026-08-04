@@ -67,6 +67,12 @@ _PRIV_PARAM_RE = re.compile(
 # 用于取得"404 基线"的确定不存在路径（拼接在主机根下）
 _BASELINE_NONCE = "_ap_probe_nonexistent_9F3A"
 
+# 本就应对外公开的路径（登录入口/用户公开页），不报"未授权访问"
+_PUBLIC_PATHS = frozenset({
+    "/login", "/admin/login", "/admin/login.php", "/wp-admin", "/wp-login.php",
+    "/user", "/users", "/account", "/profile", "/settings",
+})
+
 
 def _similarity(a, b):
     """基于 token Jaccard 的文本相似度（0~1），用于识别"软 404"。"""
@@ -122,6 +128,9 @@ def scan_access_control(url, session, timeout=6.0, verify_ssl=True, probe_sessio
         if r.status_code in (301, 302, 303, 307, 308):
             continue
         if r.status_code != 200:
+            continue
+        # 公开路径白名单：登录页/用户公开页本就应对外返回 200，不报未授权
+        if path in _PUBLIC_PATHS:
             continue
         text = r.text or ""
         # 软 404：正文与基线高度相似（自定义 404 返回 200）= 排除
