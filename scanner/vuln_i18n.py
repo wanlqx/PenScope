@@ -57,6 +57,13 @@ VULN_I18N = {
             "en": "Transmit credentials over HTTPS only, enable MFA, avoid passing tokens/secrets in URL query strings, and rate-limit login endpoints against brute force.",
         },
     },
+    "CWE-352": {
+        "name": {"zh": "跨站请求伪造（CSRF）", "en": "Cross-Site Request Forgery (CSRF)"},
+        "remediation": {
+            "zh": "为所有状态变更请求引入同源 CSRF Token 并校验；对敏感操作要求重新认证或二次确认，并通过 SameSite=Strict/Lax Cookie 属性与自定义请求头（X-Requested-With）加固。",
+            "en": "Issue and verify a same-site CSRF token on all state-changing requests; require re-auth or step-up confirmation for sensitive actions, and harden with SameSite=Strict/Lax cookies and a custom header (X-Requested-With).",
+        },
+    },
     "CWE-200": {
         "name": {"zh": "敏感信息暴露", "en": "Exposure of Sensitive Information"},
         "remediation": {
