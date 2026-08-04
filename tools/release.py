@@ -97,11 +97,17 @@ def build():
     print("构建产物：", exe, os.path.getsize(exe), "bytes")
 
 
-def read_notes():
+def read_notes(version=None):
     if not os.path.exists(CHANGELOG):
         return "See CHANGELOG.md"
     txt = open(CHANGELOG, encoding="utf-8").read()
-    # 提取第一个 "## [vX.Y.Z]" 段落直到下一个 "## " 之前
+    if version:
+        # 指定版本：精确提取该版本的 CHANGELOG 段落（用于按 tag 重新发布旧版本）
+        pat = re.compile(r"^##\s+\[v" + re.escape(version) + r"\].*?(?=^##\s|\Z)",
+                         re.M | re.S)
+        m = pat.search(txt)
+        return m.group(0).strip() if m else "See CHANGELOG.md"
+    # 未指定版本：提取第一个 "## [vX.Y.Z]" 段落（CHANGELOG 按版本倒序，即最新版）
     m = re.search(r"^##\s+\[v[^\]]+\].*?(?=^##\s|\Z)", txt, re.M | re.S)
     return m.group(0).strip() if m else "See CHANGELOG.md"
 
@@ -166,7 +172,10 @@ def main():
     elif cmd == "build":
         build()
     elif cmd == "notes":
-        print(read_notes())
+        ver = None
+        if "--version" in args:
+            ver = args[args.index("--version") + 1]
+        print(read_notes(ver))
     elif cmd == "tag":
         msg = None
         if "--message" in args:

@@ -19,6 +19,10 @@ permissions:
 jobs:
   build-and-release:
     runs-on: windows-latest
+    # 强制 Python 用 utf-8 标准流，避免 Windows runner 默认 cp1252 在打印中文时
+    # 触发 UnicodeEncodeError，导致 verify_build.py / build_nowrap.py 被误判为构建失败。
+    env:
+      PYTHONIOENCODING: utf-8
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,7 +59,7 @@ jobs:
 
       - name: Generate release notes
         shell: bash
-        run: python tools/release.py notes > .release_notes.md
+        run: python tools/release.py notes --version ${{ steps.ver.outputs.version }} > .release_notes.md
 
       - name: Check if release already exists
         id: check

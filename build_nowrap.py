@@ -7,6 +7,16 @@ Windows 上运行**。在 Linux / macOS 上 `import nt` 会直接抛 ImportError
 """
 import sys
 
+# 让本构建脚本在任意控制台编码（含 GitHub Windows runner 默认的 cp1252）下都能安全
+# 打印中文，避免 UnicodeEncodeError 让构建步骤以非零码退出而被 CI 误判为失败。
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 if sys.platform != "win32":
     sys.stderr.write(
         "build_nowrap.py 仅支持 Windows（依赖 nt 模块）。请在 Windows 环境或 windows-latest "

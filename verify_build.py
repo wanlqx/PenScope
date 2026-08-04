@@ -167,6 +167,15 @@ def _expected_version_from_source():
 
 
 if __name__ == "__main__":
+    # 让校验脚本在任意平台/控制台编码（含 GitHub Windows runner 默认的 cp1252）
+    # 下都能安全打印中文，避免 UnicodeEncodeError 被误判为「构建校验失败」而让 CI 发布失败。
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
     exe = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_EXE
     ver = sys.argv[2] if len(sys.argv) > 2 else _expected_version_from_source()
     if not os.path.exists(exe):
