@@ -129,6 +129,17 @@ def test_ssrf_sink_only():
     print("PASS test_ssrf_sink_only")
 
 
+def test_ssrf_metadata_echo_fp():
+    # 响应仅回显含元数据 URL 的查询（无真实元数据字段）-> 不应报 High
+    def resp(method, url, payload):
+        return '<html>无结果：keyword=http://169.254.169.254/latest/meta-data/</html>'
+    s = _MockSession(resp)
+    fs = scan_ssrf("http://t/?keyword=http://169.254.169.254/latest/meta-data/", s)
+    high = [f for f in fs if f["risk"] == "High"]
+    assert len(high) == 0, f"回显 URL 不应误报 SSRF 元数据，实际 {high}"
+    print("PASS test_ssrf_metadata_echo_fp")
+
+
 def test_ssrf_no_url_param():
     def resp(method, url, payload):
         return "<html>ok</html>"
@@ -164,5 +175,6 @@ if __name__ == "__main__":
     test_ssrf_file_hit()
     test_ssrf_metadata_hit()
     test_ssrf_sink_only()
+    test_ssrf_metadata_echo_fp()
     test_ssrf_no_url_param()
     print("\nALL TESTS PASSED")

@@ -116,6 +116,7 @@ def test_match_vulns_nginx_old_flagged():
 def test_match_vulns_nginx_patched_not_flagged():
     # 1.18.0 及以后已修复 CVE-2019-9511，不应告警
     assert vuln_db.match_vulns("", "nginx/1.18.0") == []
+    # 1.21.x 等更高版本更不应被误判
     assert vuln_db.match_vulns("", "nginx/1.21.0") == []
     assert vuln_db.match_vulns("", "nginx/1.21.6") == []
 
