@@ -150,6 +150,18 @@ CREATE TABLE IF NOT EXISTS target_baseline (
     captured_at TEXT NOT NULL,
     last_change_at TEXT
 );
+CREATE TABLE IF NOT EXISTS evidence_store (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    signal_type TEXT NOT NULL,
+    signal_value TEXT,
+    verdict TEXT,
+    created_at TEXT NOT NULL,
+    ttl TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_evidence_store_lookup
+    ON evidence_store(target_id, url, signal_type, ttl);
 """
 
 

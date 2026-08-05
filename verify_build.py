@@ -53,6 +53,8 @@ EXPECTED_MODULES = [
     "scanner.auth",        # v1.3.9
     "scanner.fp_guard",    # G-01 统一误报门控层（相似度/基线/拒绝词）
     "scanner.reflexion",   # G-02 Reflexion 自检层（L3 高证据二次复核降级）
+    "scanner.router",     # P4 启发式路由调度层（胜者 B skill 路由固化）
+    "scanner.evidence_store",  # P4 证据记忆落盘（跨扫描去噪）
     "scanner.advanced_injection",  # P5 CWE 缺口补齐（SSTI/XXE/JWT/NoSQL/IDOR）
     "scanner.open_redirect",  # v1.4.0
     "scanner.scope",       # v1.4.2 AP-001 重定向作用域围栏助手（scope-aware）

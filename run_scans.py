@@ -72,6 +72,12 @@ from scanner.advanced_injection import (
     scan_ssti, scan_xxe, scan_jwt_none, scan_nosql, scan_idor,
 )
 
+# P4 固化胜者 B：Web 检测模块默认执行顺序（与 _detect_page_async._jobs 对齐，
+# 供启发式路由层 plan() 重排参考；顺序本身保持不变以保证零误报基线）
+_CAT_ORDER = ["SQL注入", "XSS", "CSRF", "文件上传", "命令注入", "路径遍历", "SSRF",
+              "缺失授权", "认证缺陷", "开放重定向", "SSTI", "XXE", "JWT算法混淆",
+              "NoSQL注入", "IDOR"]
+
 # U-02：闸门通知钩子（由 main_gui 注册，用于系统托盘气泡 + 任务栏闪烁）。
 # 解耦设计：run_scans 不直接依赖 GUI；main_gui 在启动时注册监听器，
 # 扫描到关键节点暂停时通过此钩子即时推送通知，无需轮询。
@@ -359,12 +365,29 @@ async def _detect_page_async(page, vs, pg, scan, renewal=None):
     每个扫描器使用独立 Session，结果回主线程写库，避免共享 Session 与计数竞争。
     renewal：C-06 会话续期控制器。若提供，则每个扫描器复用「与该控制器共享认证态、
     且会自动续期」的 RenewableSession，使已授权目标的登录态在整个扫描周期保持有效。"""
+    # P4 固化胜者 B：启发式路由 + 跨扫描证据去噪（零误报优先，全覆盖）
+    # 单页只读探测一次取信号 → 重排高级模块优先级；已知噪声页跳过高级注入（不引入漏报）。
+    _order = None
+    _skip_adv = False
+    try:
+        from scanner.router import probe_signals, plan, ADV_CATS
+        from scanner.evidence_store import is_known_noise
+        _ps = requests.Session()
+        _ps.headers.update({"User-Agent": "PenScope/1.0"})
+        _sig = probe_signals(_ps, page, verify_ssl=vs)
+        _ps.close()
+        _order = plan(_sig, _CAT_ORDER)
+        if is_known_noise(scan["target_id"], page):
+            _skip_adv = True
+    except Exception as _e:
+        logging.debug("router/evidence init skipped: %s", _e)
+
     def _jobs():
         # C-05：默认凭据探测开关可由代码主闸门（ENABLE_AUTH_PROBE）或设置项
         # enable_auth_probe 开启；自定义字典经设置项 auth_probe_dict 传入。
         enable_probe = (str(get_setting("enable_auth_probe") or "").lower() in ("1", "true")) or ENABLE_AUTH_PROBE
         custom_dict = (get_setting("auth_probe_dict") or "").strip() or None
-        return [
+        jobs = [
             ("SQL注入", lambda s: scan_sqli(page, s, pg, verify_ssl=vs)),
             ("XSS", lambda s: scan_xss(page, s, pg, verify_ssl=vs)),
             ("CSRF", lambda s: scan_csrf(page, s, verify_ssl=vs)),
@@ -383,6 +406,13 @@ async def _detect_page_async(page, vs, pg, scan, renewal=None):
             ("NoSQL注入", lambda s: scan_nosql(page, s, verify_ssl=vs)),
             ("IDOR", lambda s: scan_idor(page, s, verify_ssl=vs)),
         ]
+        # P4：跨扫描证据去噪 —— 已知噪声页（软404/拒绝页/错误页）无注入面，跳过高级注入
+        if _skip_adv:
+            jobs = [j for j in jobs if j[0] not in ADV_CATS]
+        # P4：启发式路由 —— 按信号提升优先级（覆盖率不变，仅重排出结果顺序）
+        if _order is not None:
+            jobs.sort(key=lambda j: _order.index(j[0]) if j[0] in _order else len(_order))
+        return jobs
 
     async def _run(cat, fn):
         # C-06：若启用会话续期，复用续期会话（共享认证态 + 自动重登）；否则独立裸会话。
@@ -694,6 +724,17 @@ def _stage_web_detect(scan):
                   f"Reflexion 自检降级 {rx['downgraded']}/{rx['reviewed']} 项高证据发现（疑似误报）")
     except Exception as e:
         audit(scan["created_by"], "reflexion_err", t["host"], f"Reflexion 自检异常: {e}")
+    # ② 证据记忆落盘：把 Reflexion 降级（疑似误报）发现的端点持久化为噪声证据，
+    # 支撑跨扫描去噪（二次扫描该端点跳过高级注入，不重复探测、不引入漏报）。
+    try:
+        from scanner.evidence_store import record, prune_expired, SIG_DENIED
+        for f in findings_of(scan["id"]):
+            if f.get("verification_status") == "unverified" and f.get("endpoint"):
+                record(scan["target_id"], f["endpoint"], SIG_DENIED,
+                       "reflexion_downgraded", "疑似误报-Reflexion降级")
+        prune_expired()
+    except Exception as e:
+        audit(scan["created_by"], "evidence_store_err", t["host"], f"证据记忆落盘异常: {e}")
     # 闸门备注以「入库去重后」的发现为准，避免原始多分隔符计数虚高（见 scan_cmd 去重）
     _stored = findings_of(scan["id"])
     _sql_high = sum(1 for f in _stored if f["category"] == "SQL注入" and f["risk"] in ("High", "Critical"))
