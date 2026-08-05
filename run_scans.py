@@ -62,6 +62,7 @@ from scanner.payloads import PayloadGenerator, detect_db_from_error, detect_waf
 from scanner.plugin_base import ScanContext
 from scanner.plugins import load_plugins
 from scanner.port_scan import fingerprint_web, scan_ports
+from scanner.logctx import set_scan_context, clear_scan_context
 from scanner.ssrf import scan_ssrf
 from scanner.subdomain import scan_subdomain_assets
 from scanner.traversal import scan_traversal
@@ -954,6 +955,9 @@ def process_scan(scan):
                          f" ({note})" if note else "")
 
     _evt(stage, "start")
+    # 结构化日志（F-09）：整个阶段统一注入 scan 上下文，使端口/web/插件等模块日志
+    # 经 CtxFormatter 自动携带 [scan=.. target=..]，无需各模块手动绑定 LoggerAdapter。
+    set_scan_context(sid, scan.get("target_id"))
     try:
         func(scan)
     except Exception as e:
@@ -963,6 +967,8 @@ def process_scan(scan):
         audit(scan["created_by"], "scan_failed", f"scan#{sid}",
               f"阶段 [{stage}] 异常终止：{cat} - {detail}")
         return
+    finally:
+        clear_scan_context()
     refreshed = get_scan(sid)
     if refreshed["status"] == "awaiting_review":
         _evt(stage, "paused")
