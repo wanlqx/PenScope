@@ -136,5 +136,63 @@ def main():
     srv.shutdown()
 
 
+# ---- CWE-306 未授权端点 降噪（误报治理）----
+class _FakeResp:
+    def __init__(self, code, text=""):
+        self.status_code = code
+        self.text = text
+
+
+class _FakeSession:
+    """按 path 路由的假 session：route = {path: (code, text)}。"""
+    def __init__(self, route):
+        self.route = route
+
+    def get(self, url, timeout=None, verify=None, allow_redirects=None):
+        from urllib.parse import urlparse
+        p = urlparse(url).path
+        code, text = self.route.get(p, (404, ""))
+        return _FakeResp(code, text)
+
+
+def test_cwe306_unauth_reachable_downgraded_to_info():
+    """Unauth 端点 200 可达（多为登录/认证页）应降为 Info(L1)，不得误判 Medium 缺失鉴权。"""
+    from scanner.known_vuln import passive_probe
+    eps = [
+        {"product": "Tomcat", "path": "/manager/html", "vuln": "Unauth", "severity": None},
+        {"product": "X", "path": "/rce", "vuln": "RCE", "severity": None},
+    ]
+    s = _FakeSession({
+        "/manager/html": (200, "<html>Apache Tomcat/Login</html>"),
+        "/rce": (200, "<html>unexpected output</html>"),
+    })
+    res = passive_probe(s, "http://x/", eps, home_body="<html>home</html>")
+    by_path = {r["path"]: r for r in res}
+    assert "/manager/html" in by_path, "Unauth 端点 200 应产出线索"
+    assert by_path["/manager/html"]["severity"] == "Info", \
+        "Unauth 200 应降为 Info（避免把登录页误判为 Medium 缺失鉴权）"
+    assert by_path["/manager/html"]["evidence_level"] == "L1"
+    assert "/rce" in by_path, "非认证敏感端点不应被降噪影响"
+    assert by_path["/rce"]["severity"] == "Medium", "非认证敏感端点 200 仍应 Medium（真阳性保留）"
+
+
+def test_cwe306_unauth_explicit_severity_respected():
+    """端点显式设置 severity（如 High）应被尊重，不被降噪覆盖。"""
+    from scanner.known_vuln import passive_probe
+    eps = [{"product": "Tomcat", "path": "/manager/html", "vuln": "Unauth", "severity": "High"}]
+    s = _FakeSession({"/manager/html": (200, "x")})
+    res = passive_probe(s, "http://x/", eps)
+    assert res[0]["severity"] == "High", "显式 severity 应被尊重，不被降噪覆盖"
+
+
+def test_cwe306_unauth_denied_stays_info():
+    """Unauth 端点返回 403（存在但被拒）→ exists_denied Info，行为不变。"""
+    from scanner.known_vuln import passive_probe
+    eps = [{"product": "Jboss", "path": "/jmx-console/", "vuln": "Unauth", "severity": None}]
+    s = _FakeSession({"/jmx-console/": (403, "<html>forbidden</html>")})
+    res = passive_probe(s, "http://x/", eps)
+    assert res and res[0]["severity"] == "Info" and res[0]["verdict"] == "exists_denied"
+
+
 if __name__ == "__main__":
     main()
