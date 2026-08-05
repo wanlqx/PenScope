@@ -21,6 +21,7 @@ from urllib.parse import parse_qs, urlparse, urlunparse
 import requests
 
 from cvss_dedup import cwe_for
+from scanner import fp_guard
 from scanner.web_scan import _mk, discover
 
 _UA = "PenScope/1.0 (authorized security test)"
@@ -47,16 +48,6 @@ _STATIC_EXT = (
     ".xml", ".webmanifest",
 )
 
-# 响应正文出现这些标志时，说明访问实际已被拒绝或要求登录，应排除"未授权访问"误报
-_DENIED_MARKERS = (
-    "unauthorized", "forbidden", "access denied", "access is denied",
-    "not authorized", "please login", "please log in", "login required",
-    "authentication required", "requires authentication", "sign in",
-    "permission denied", "not permitted",
-    "需要登录", "请登录", "无权限", "没有权限", "拒绝访问", "未授权",
-    "登录后", "请先登录", "权限不足", "鉴权失败",
-)
-
 # JS 客户端重定向模式：部分应用用 JS（而非 HTTP 30x）跳转登录页
 # 匹配 window.location / parent.location / top.location 赋值（绝对或相对 URL）
 _RE_JS_REDIRECT = re.compile(
@@ -71,28 +62,6 @@ _PRIV_PARAM_RE = re.compile(
     r"permission|acl|owner|group|superuser|isadmin|moderator|access|"
     r"memberid|member_id|accountid|account_id|orderid|order_id)\b"
 )
-
-# 用于取得"404 基线"的确定不存在路径（拼接在主机根下）
-_BASELINE_NONCE = "_ap_probe_nonexistent_9F3A"
-
-# 本就应对外公开的路径（登录入口/用户公开页），不报"未授权访问"
-_PUBLIC_PATHS = frozenset({
-    "/login", "/admin/login", "/admin/login.php", "/wp-admin", "/wp-login.php",
-    "/user", "/users", "/account", "/profile", "/settings",
-})
-
-
-def _similarity(a, b):
-    """基于 token Jaccard 的文本相似度（0~1），用于识别"软 404"。"""
-    if not a or not b:
-        return 0.0
-    sa = set(re.findall(r"[a-z0-9一-鿿]+", a.lower()))
-    sb = set(re.findall(r"[a-z0-9一-鿿]+", b.lower()))
-    if not sa and not sb:
-        return 1.0
-    if not sa or not sb:
-        return 0.0
-    return len(sa & sb) / len(sa | sb)
 
 
 def _host_root(url):
@@ -114,13 +83,7 @@ def scan_access_control(url, session, timeout=6.0, verify_ssl=True, probe_sessio
     root = _host_root(url)
 
     # 基线：请求一个确定不存在的路径，记录其响应作为"无内容"基准（软 404 比对用）
-    baseline_text = ""
-    try:
-        r0 = probe_session.get(root + _BASELINE_NONCE, timeout=timeout,
-                               verify=verify_ssl, allow_redirects=False)
-        baseline_text = r0.text or ""
-    except requests.RequestException:
-        baseline_text = ""
+    baseline_text = fp_guard.baseline_probe(probe_session, root, verify_ssl, timeout)
 
     seen = set()
     for path in _SENSITIVE_PATHS:
@@ -138,15 +101,14 @@ def scan_access_control(url, session, timeout=6.0, verify_ssl=True, probe_sessio
         if r.status_code != 200:
             continue
         # 公开路径白名单：登录页/用户公开页本就应对外返回 200，不报未授权
-        if path in _PUBLIC_PATHS:
+        if fp_guard.is_public_path(path):
             continue
         text = r.text or ""
         # 软 404：正文与基线高度相似（自定义 404 返回 200）= 排除
-        if baseline_text and _similarity(text, baseline_text) > 0.85:
+        if fp_guard.soft404_filter(text, baseline_text):
             continue
         # 访问已被拒绝或要求登录：排除"未授权访问"误报
-        low_text = text.lower()
-        if any(d in low_text for d in _DENIED_MARKERS):
+        if fp_guard.is_denied_page(text):
             continue
         # JS 客户端重定向到登录页：应用用 JS（而非 HTTP 30x）做认证跳转，实际受保护
         if _RE_JS_REDIRECT.search(text):

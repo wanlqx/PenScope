@@ -68,6 +68,9 @@ from scanner.subdomain import scan_subdomain_assets
 from scanner.traversal import scan_traversal
 from scanner.vuln_db import match_vulns
 from scanner.web_scan import _send_form, collect_pages, discover, find_upload_forms, scan_csrf, scan_sqli, scan_xss
+from scanner.advanced_injection import (
+    scan_ssti, scan_xxe, scan_jwt_none, scan_nosql, scan_idor,
+)
 
 # U-02：闸门通知钩子（由 main_gui 注册，用于系统托盘气泡 + 任务栏闪烁）。
 # 解耦设计：run_scans 不直接依赖 GUI；main_gui 在启动时注册监听器，
@@ -373,6 +376,12 @@ async def _detect_page_async(page, vs, pg, scan, renewal=None):
             ("认证缺陷", lambda s: scan_auth(page, s, enable_auth_probe=enable_probe,
                                             cred_dict_path=custom_dict, verify_ssl=vs)),
             ("开放重定向", lambda s: scan_open_redirect(page, s, verify_ssl=vs)),
+            # P5：CWE 覆盖缺口补齐（实战进化）—— 高级注入类，全只读被动
+            ("SSTI", lambda s: scan_ssti(page, s, verify_ssl=vs)),
+            ("XXE", lambda s: scan_xxe(page, s, verify_ssl=vs)),
+            ("JWT算法混淆", lambda s: scan_jwt_none(page, s, verify_ssl=vs)),
+            ("NoSQL注入", lambda s: scan_nosql(page, s, verify_ssl=vs)),
+            ("IDOR", lambda s: scan_idor(page, s, verify_ssl=vs)),
         ]
 
     async def _run(cat, fn):
@@ -675,6 +684,16 @@ def _stage_web_detect(scan):
                     t["host"], cwe="CWE-287", endpoint=t["host"], http_method="AUTH",
                     verification_status="info", evidence_level="L1")
     summary["uploads"] = all_uploads
+    # G-02：Reflexion 自检 —— 对所有 L3/L4/verified 高证据发现独立二次复核，降级疑似误报
+    try:
+        from scanner.reflexion import review_scan
+        rx = review_scan(scan["id"], session=wsession, verify_ssl=vs,
+                         audit=lambda a, tgt, n: audit(scan["created_by"], a, tgt, n))
+        if rx["downgraded"]:
+            audit(scan["created_by"], "reflexion_summary", t["host"],
+                  f"Reflexion 自检降级 {rx['downgraded']}/{rx['reviewed']} 项高证据发现（疑似误报）")
+    except Exception as e:
+        audit(scan["created_by"], "reflexion_err", t["host"], f"Reflexion 自检异常: {e}")
     # 闸门备注以「入库去重后」的发现为准，避免原始多分隔符计数虚高（见 scan_cmd 去重）
     _stored = findings_of(scan["id"])
     _sql_high = sum(1 for f in _stored if f["category"] == "SQL注入" and f["risk"] in ("High", "Critical"))

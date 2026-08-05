@@ -17,6 +17,7 @@
 import re
 from urllib.parse import urljoin
 
+from scanner import fp_guard
 from scanner.web_scan import _mk
 
 # 只探测「已知敏感/常见」路径；规模克制，不做无差别全字典爆破（避免噪音与合规风险）
@@ -69,45 +70,9 @@ _RE_DIRINDEX = re.compile(r'(<title>\s*index of|directory listing for|ftp listin
 
 _READ_LIMIT = 65536  # 单次 GET 最多读取 64KB 用于内容判定
 
-# —— 软 404 / 访问拒绝降噪（与 access_control.py 对齐）——
-
-# 响应正文出现这些标志时，说明访问实际已被拒绝或要求登录，应排除误报
-_DENIED_MARKERS = (
-    "unauthorized", "forbidden", "access denied", "access is denied",
-    "not authorized", "please login", "please log in", "login required",
-    "authentication required", "requires authentication", "sign in",
-    "permission denied", "not permitted",
-    "需要登录", "请登录", "无权限", "没有权限", "拒绝访问", "未授权",
-    "登录后", "请先登录", "权限不足", "鉴权失败",
-)
-
-# 本就应对外公开的路径（登录入口/公开资源），命中时不报"缺失授权"
-_PUBLIC_PATHS = frozenset({
-    "/login", "/admin/login", "/wp-admin", "/wp-login.php",
-    "/user", "/users", "/account", "/profile", "/settings",
-    "/robots.txt", "/sitemap.xml", "/crossdomain.xml",
-    "/.well-known/security.txt",
-})
-
 # .env 类路径的正文特征：真正的环境文件应含 KEY=VALUE 格式行
 _RE_ENV_LIKE = re.compile(
     r'^[A-Z_][A-Z0-9_]*\s*=\s*[\'"]?[^\s\'"=]+', re.MULTILINE)
-
-_BASELINE_NONCE = "_cs_probe_nonexistent_7B2E"
-
-
-def _similarity(a, b):
-    """基于 token Jaccard 的文本相似度（0~1），用于识别软 404。与 access_control.py 同款。"""
-    if not a or not b:
-        return 0.0
-    sa = set(re.findall(r"[a-z0-9一-鿿]+", a.lower()))
-    sb = set(re.findall(r"[a-z0-9一-鿿]+", b.lower()))
-    if not sa and not sb:
-        return 1.0
-    if not sa or not sb:
-        return 0.0
-    return len(sa & sb) / len(sa | sb)
-
 
 def _read_body(r):
     """以 stream 方式限长读取响应体，避免下载大文件。"""
@@ -158,9 +123,7 @@ def scan_content(base_url, session, timeout=6.0, verify_ssl=True, paths=None):
     try:
         probe_sess = requests.Session()
         probe_sess.headers.update({"User-Agent": "PenScope/1.0 (authorized security test)"})
-        r0 = probe_sess.get(root + _BASELINE_NONCE, timeout=timeout,
-                            verify=verify_ssl, allow_redirects=False)
-        baseline_text = r0.text or ""
+        baseline_text = fp_guard.baseline_probe(probe_sess, root, verify_ssl, timeout)
     except Exception:
         baseline_text = ""
 
@@ -183,14 +146,14 @@ def scan_content(base_url, session, timeout=6.0, verify_ssl=True, paths=None):
 
             # ③ 公开路径白名单：登录页等本就应对外公开，跳过"未授权"类报告
             #    （但仍保留后续的敏感信息泄露正则扫描，因为登录页也可能泄露信息）
-            is_public = p in _PUBLIC_PATHS
+            is_public = fp_guard.is_public_path(p)
 
             if status == 200 and is_sens and not is_public:
                 # ① 软 404 排除：与基线高度相似 → 应用对不存在路径返回了通用 200 页
-                if baseline_text and _similarity(body, baseline_text) > 0.85:
+                if fp_guard.soft404_filter(body, baseline_text):
                     pass  # 软 404，不报
                 # ② 拒绝关键词排除：200 但正文含"请登录/forbidden"等
-                elif any(d in body.lower() for d in _DENIED_MARKERS):
+                elif fp_guard.is_denied_page(body):
                     pass  # 软拒绝页，不报
                 else:
                     # ④ .env 类路径额外验证正文是否像环境文件（含 KEY=VALUE 行）
@@ -226,7 +189,7 @@ def scan_content(base_url, session, timeout=6.0, verify_ssl=True, paths=None):
                         ))
             elif status == 200 and _RE_DIRINDEX.search(body):
                 # 目录列表也做软 404 排除（避免 catch-all 路由的 200 页误报）
-                if baseline_text and _similarity(body, baseline_text) > 0.85:
+                if fp_guard.soft404_filter(body, baseline_text):
                     pass  # 与基线太像，不是真正的目录列表
                 else:
                     findings.append(_mk(

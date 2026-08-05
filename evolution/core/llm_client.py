@@ -24,6 +24,30 @@ _HEURISTIC_PLAN = {
     "chain_xss": "先用 XSS 设 admin cookie, 再访问 admin",
     "chain_sqli": "认证绕过取 session, 再取 flag",
     "pivot": "先发现内网主机, 再访问内网服务",
+    # —— 移植自公开 CTF 题型 (Z1 扩展) ——
+    "ssti": "服务端模板注入, 注入 {{7*7}} 等表达式求值",
+    "xxe": "构造含外部实体的 XML, 触发文件读取/SSRF",
+    "jwt": "篡改 JWT alg=none 或弱密钥, 提权为 admin",
+    "nosql": "向 MongoDB 查询注入 {$ne:''} 绕过认证",
+    "idor": "篡改对象 ID 越权访问他人资源",
+    "cookie_tamper": "篡改 Cookie 中的 role 字段提权",
+    "csrf": "缺少 CSRF 令牌的状态变更被冒用",
+    # —— Z2 CVE / 云 / AI 基础设施 ——
+    "log4shell": "注入 ${jndi:ldap://} 触发远程类加载",
+    "spring4shell": "Spring 数据绑定 class.module 绕过 RCE",
+    "backup_leak": "访问遗留备份/源码文件泄露机密",
+    "ai_prompt_leak": "诱导暴露系统提示词/AI 服务配置",
+    "s3_bucket": "公开对象存储列举, 取私密对象",
+    # —— Z3 链式 / Z4 内网 ——
+    "stored_xss": "存储型 XSS 被管理员触发后取凭据",
+    "lfi_chain": "LFI 读配置取凭据, 再用凭据提权",
+    "oauth_chain": "OAuth code->token->资源 三步链式",
+    "privesc": "利用弱口令/硬编码密钥从低权升管理员",
+    "internal_ssrf": "SSRF 打内网管理面板",
+    "leaked_creds": "内网凭据Dump泄露, 直接取机密",
+    "xff_bypass": "伪造 X-Forwarded-For 绕过内网信任",
+    "lateral": "发现内网多主机, 横向移动到目标",
+    "trust_boundary": "利用内部信任标记绕过鉴权",
 }
 
 

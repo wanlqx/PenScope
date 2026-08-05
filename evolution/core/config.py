@@ -50,7 +50,7 @@ def load_challenges() -> list:
 TEAMS = {
     "A": {"name": "PenScope-Classic", "workflow": "现状 scanner 流水线 (广覆盖, 偶发误报)",
           "color": "#4aa3ff"},
-    "B": {"name": "VulnClaw-Style", "workflow": "LLM 主导 + skill 动态路由 + reflexion 自纠 + 证据记忆",
+    "B": {"name": "VulnClaw-Style", "workflow": "启发式 skill 路由 + reflexion 自纠 + 证据记忆 (无外部 LLM)",
           "color": "#ff6b6b"},
     "C": {"name": "KB-Driven", "workflow": "knowledge_feed 情报驱动, 先查知识库再定向检测",
           "color": "#ffd166"},

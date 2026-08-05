@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from core.config import LAB_PORT, LAB_BASE, TEAMS, load_challenges  # noqa: E402
 from core.client import LabClient  # noqa: E402
 from teams.agents import build_teams  # noqa: E402
-from referee import rank_and_score, aggregate, release_answers  # noqa: E402
+from referee import rank_and_score, aggregate, release_answers, WRONG_ATTEMPT_PENALTY  # noqa: E402
 
 _LAB_DIR = os.path.join(os.path.dirname(__file__), "lab")
 
@@ -73,10 +73,6 @@ def run_simulation(port: int = LAB_PORT, challenges: list | None = None):
     for c in challenges:
         cid = c["id"]
         results = phase1_results.get(cid) or phase2_results.get(cid)
-        # 叠加元游戏的 wrong 成本
-        for r in results:
-            if r.team in meta_actions and meta_actions[r.team]["type"] == "attack":
-                r.wrong += 1
         scores = rank_and_score(c["points"], results)
         per_challenge.append(scores)
         detail.append({
@@ -90,14 +86,24 @@ def run_simulation(port: int = LAB_PORT, challenges: list | None = None):
     agg = aggregate(per_challenge, list(teams.keys()))
     answers = release_answers(challenges)
 
+    # 元游戏成本: 进攻队每队一次性 +1 wrong 成本 (非逐题累加)
+    totals = agg["totals"]
+    for key, act in meta_actions.items():
+        if act["type"] == "attack":
+            totals[key] -= WRONG_ATTEMPT_PENALTY
+
+    ranking = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
+    agg["totals"] = totals
+    agg["ranking"] = ranking
+
     return {
         "base": base,
         "phase1": [c["id"] for c in phase1],
         "phase2": [c["id"] for c in phase2],
         "meta_actions": meta_actions,
         "detail": detail,
-        "totals": agg["totals"],
-        "ranking": agg["ranking"],
+        "totals": totals,
+        "ranking": ranking,
         "answers": answers,
         "teams": {k: {"name": v.name, "workflow": v.workflow} for k, v in teams.items()},
     }

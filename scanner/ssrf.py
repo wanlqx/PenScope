@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse, urlunparse
 import requests
 
 from cvss_dedup import cwe_for
+from scanner import fp_guard
 from scanner.web_scan import _mk, _send_form, discover
 
 # URL/file 类参数名（潜在 SSRF sink）
@@ -54,24 +55,6 @@ _ERROR_PAGE_MARKERS = (
     "forbidden", "error", "exception", "服务器错误", "内部错误",
     "gateway", "timeout", "unavailable",
 )
-
-# 基线探针（与 access_control.py / contentscan.py 对齐）
-_SSRF_BASELINE_NONCE = "_ssrf_probe_nonexistent_4D1C"
-
-
-def _similarity(a, b):
-    """基于 token Jaccard 的文本相似度（0~1），用于识别软 404。"""
-    if not a or not b:
-        return 0.0
-    import re as _re
-    sa = set(_re.findall(r"[a-z0-9一-鿿]+", a.lower()))
-    sb = set(_re.findall(r"[a-z0-9一-鿿]+", b.lower()))
-    if not sa and not sb:
-        return 1.0
-    if not sa or not sb:
-        return 0.0
-    return len(sa & sb) / len(sa | sb)
-
 
 def _count_meta_markers(text):
     """统计响应体中命中的元数据特征数量。"""
@@ -140,13 +123,7 @@ def scan_ssrf(url, session, timeout=6.0, verify_ssl=True):
     from urllib.parse import urlunparse, urlparse as _uparse
     parsed = _uparse(url)
     root = urlunparse((parsed.scheme, parsed.netloc, "/", "", "", ""))
-    baseline_text = ""
-    try:
-        r0 = session.get(root + _SSRF_BASELINE_NONCE, timeout=timeout,
-                        verify=verify_ssl, allow_redirects=False)
-        baseline_text = (r0.text or "") if r0.status_code == 200 else ""
-    except Exception:
-        baseline_text = ""
+    baseline_text = fp_guard.baseline_probe(session, root, verify_ssl, timeout)
 
     seen_hit = set()
     seen_sink = set()
@@ -169,7 +146,7 @@ def scan_ssrf(url, session, timeout=6.0, verify_ssl=True):
             if _is_error_page(text):
                 continue
             # ③ 软 404 排除：与基线高度相似
-            if baseline_text and _similarity(text, baseline_text) > 0.85:
+            if fp_guard.soft404_filter(text, baseline_text):
                 continue
             m = _detect_file_content(text)
             if m:
@@ -207,7 +184,7 @@ def scan_ssrf(url, session, timeout=6.0, verify_ssl=True):
             if _is_error_page(text):
                 continue
             # ③ 软 404 排除：与基线高度相似 → URL 回显在错误页中
-            if baseline_text and _similarity(text, baseline_text) > 0.85:
+            if fp_guard.soft404_filter(text, baseline_text):
                 continue
             # ④ 需 ≥2 个不同元数据特征同时出现（防止单关键词 URL 回显误报）
             if _count_meta_markers(text) < _META_MIN_HITS:

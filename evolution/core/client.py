@@ -11,11 +11,19 @@ class LabClient:
     def __init__(self, base: str):
         self.base = base.rstrip("/")
         self.cookies: dict = {}
+        self.extra_headers: dict = {}
+
+    def set_cookie(self, k: str, v: str):
+        self.cookies[k] = v
+
+    def set_header(self, k: str, v: str):
+        self.extra_headers[k] = v
 
     def _hdr(self):
         h = {"User-Agent": "PenScopeEvo/1.0"}
         if self.cookies:
             h["Cookie"] = "; ".join(f"{k}={v}" for k, v in self.cookies.items())
+        h.update(self.extra_headers)
         return h
 
     def _store_cookies(self, resp_headers):
@@ -49,6 +57,23 @@ class LabClient:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers={
             **self._hdr(), "Content-Type": "application/json"})
+        try:
+            r = urllib.request.urlopen(req, timeout=8)
+            body = r.read(16384).decode("utf-8", "ignore")
+            self._store_cookies(r.headers)
+            return r.status, body, dict(r.headers)
+        except urllib.error.HTTPError as e:
+            body = e.read(16384).decode("utf-8", "ignore")
+            self._store_cookies(e.headers)
+            return e.code, body, dict(e.headers)
+        except Exception as e:  # noqa
+            return 0, f"ERROR:{e}", {}
+
+    def post_raw(self, path: str, body: str, content_type: str = "application/xml"):
+        url = self.base + path
+        data = body.encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={
+            **self._hdr(), "Content-Type": content_type})
         try:
             r = urllib.request.urlopen(req, timeout=8)
             body = r.read(16384).decode("utf-8", "ignore")

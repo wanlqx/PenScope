@@ -37,6 +37,12 @@ _CVSS_MAP = {
     "认证缺陷":  {"score": 9.8, "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"},
     # P4：开放重定向（v1.4.0，知识库缺口分析驱动）—— CWE-601
     "开放重定向": {"score": 6.1, "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"},
+    # P5：CWE 覆盖缺口补齐（实战进化）—— SSTI / XXE / JWT / NoSQL / IDOR
+    "SSTI":        {"score": 8.6, "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},  # 模板注入可演进 RCE
+    "XXE":         {"score": 7.5, "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"},  # 外部实体读取
+    "JWT算法混淆": {"score": 8.1, "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"},  # alg:none 认证绕过
+    "NoSQL注入":   {"score": 8.6, "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
+    "IDOR":        {"score": 7.5, "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"},  # 越权访问他人对象
 }
 
 
@@ -94,6 +100,12 @@ CWE_MAP = {
     "认证缺陷": "CWE-287",
     # P4：开放重定向（v1.4.0，知识库缺口分析驱动）—— CWE-601
     "开放重定向": "CWE-601",
+    # P5：CWE 覆盖缺口补齐（实战进化）
+    "SSTI": "CWE-1336",
+    "XXE": "CWE-611",
+    "JWT算法混淆": "CWE-347",
+    "NoSQL注入": "CWE-943",
+    "IDOR": "CWE-639",
 }
 
 
@@ -124,14 +136,22 @@ _VULN_TYPE_ALIASES = {
     "directory traversal": "path_traversal",
     # P3：缺失授权 / 认证缺陷 别名（v1.3.9）
     "缺失授权": "缺失授权", "未授权访问": "缺失授权", "broken access control": "缺失授权",
-    "越权": "缺失授权", "水平越权": "缺失授权", "垂直越权": "缺失授权", "idor": "缺失授权",
-    "access control": "缺失授权", "missing authorization": "缺失授权", "forced browsing": "缺失授权",
+    "垂直越权": "缺失授权", "access control": "缺失授权",
+    "missing authorization": "缺失授权", "forced browsing": "缺失授权",
     "认证缺陷": "认证缺陷", "弱口令": "认证缺陷", "弱密码": "认证缺陷", "默认凭据": "认证缺陷",
     "弱默认凭据": "认证缺陷", "authentication": "认证缺陷", "auth defect": "认证缺陷",
     "missing authentication": "认证缺陷", "弱认证": "认证缺陷", "authentication weakness": "认证缺陷",
     # P4：开放重定向 别名（v1.4.0）
     "开放重定向": "开放重定向", "开放重定向漏洞": "开放重定向", "open redirect": "开放重定向",
     "url redirect": "开放重定向", "openredirection": "开放重定向", "跳转漏洞": "开放重定向",
+    # P5：CWE 覆盖缺口补齐 别名（实战进化）
+    "ssti": "SSTI", "服务端模板注入": "SSTI", "模板注入": "SSTI", "server side template injection": "SSTI",
+    "xxe": "XXE", "xml外部实体": "XXE", "外部实体": "XXE", "xml external entity": "XXE",
+    "jwt": "JWT算法混淆", "jwt算法混淆": "JWT算法混淆", "alg:none": "JWT算法混淆",
+    "jwt alg none": "JWT算法混淆", "json web token": "JWT算法混淆",
+    "nosql": "NoSQL注入", "nosql注入": "NoSQL注入", "mongodb注入": "NoSQL注入", "nosql injection": "NoSQL注入",
+    "idor": "IDOR", "越权访问": "IDOR", "不安全的直接对象引用": "IDOR",
+    "insecure direct object reference": "IDOR", "水平越权": "IDOR", "对象越权": "IDOR",
 }
 
 

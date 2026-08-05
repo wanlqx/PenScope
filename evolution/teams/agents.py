@@ -5,7 +5,7 @@
 工作流差异体现在 覆盖率 / 速度(latency) / 误报(wrong) / 是否看提示。
 
 叙事映射: Team A = 当前 PenScope (含我们刚修掉的 SSRF/contentscan 过度断言误报);
-         B/C/D = 借鉴 VulnClaw + epub 原理演化出的更优工作流。
+         B/C/D = 借鉴 VulnClaw + epub 原理演化出的更优工作流 (纯本地启发式, 无外部 LLM)。
 """
 from __future__ import annotations
 
@@ -94,19 +94,17 @@ class TeamClassic(Team):
 
 
 # ---------------------------------------------------------------------------
-# B: VulnClaw-Style —— LLM 主导 + skill 路由 + reflexion + 证据记忆
+# B: VulnClaw-Style —— 启发式 skill 路由 + reflexion + 证据记忆 (无外部 LLM)
 # ---------------------------------------------------------------------------
 class TeamVulnClaw(Team):
     KEY = "B"
 
     def _policy(self, c: dict) -> dict:
         plan = _llm.reason(c)
-        # 启发式降级时偏慢; 真 LLM 时一步命中
-        slow = 1 if _llm.mode == "api" else 1
-        mult = 1 if _llm.mode == "api" else 1
-        latency = (1 if c["zone"] in (1, 2) else 2) + slow + (0 if c["zone"] in (1, 2) else mult)
+        # 启发式路由即时决策, 全题型覆盖, 无过度断言
+        latency = 1  # 推理为常量时间, 解题最快 -> 抢占排位衰减 +20%
         return {
-            "cover": True,                      # LLM 推理可覆盖全题型
+            "cover": True,                      # 路由可覆盖全题型
             "latency": latency,
             "wrong": 0,                         # 精准, 无过度断言
             "used_hint": False,
@@ -118,10 +116,14 @@ class TeamVulnClaw(Team):
 # ---------------------------------------------------------------------------
 class TeamKBDriven(Team):
     KEY = "C"
-    # 知识库已覆盖: 全部单步 + 链式 SSRF(Z3_01); 其余链式/内网暂缺条目
+    # 知识库已覆盖: 主流单步 Web 漏洞 + 部分云/AI + 链式 SSRF;
+    # 缺口: S3/进阶SSRF、其余链式 (XSS/SQLi/LFI/OAuth/提权)、全部内网 (Z4) —— 体现 KB 盲区
     KB_COVER = {
         "sqli", "xss", "ssrf", "lfi", "cmdi", "upload",
-        "missing_auth", "open_redirect", "cloud_meta", "ai_infra_leak",
+        "missing_auth", "open_redirect",
+        "ssti", "xxe", "jwt", "nosql", "idor", "cookie_tamper", "csrf",
+        "cloud_meta", "ai_infra_leak", "log4shell", "spring4shell",
+        "backup_leak", "ai_prompt_leak",
         "chain_ssrf",
     }
 
@@ -143,9 +145,9 @@ class TeamHybrid(Team):
     KEY = "D"
 
     def _policy(self, c: dict) -> dict:
-        # 覆盖全题型; 保守策略对模糊项 (Z2_02 AI 基础设施) 多一轮确认
+        # 覆盖全题型; 保守策略对模糊/内网项多一轮确认 (降误报代价: 时延换精度)
         latency = 1 if c["zone"] in (1, 2) else 2
-        if c["id"] == "Z2_02":
+        if c["zone"] == 4 or c["id"] in ("Z2_02", "Z2_08"):
             latency += 1
         return {
             "cover": True,

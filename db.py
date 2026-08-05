@@ -768,6 +768,32 @@ def findings_of(scan_id):
     return [dict(r) for r in rows]
 
 
+def update_finding_fields(fid, **fields):
+    """更新 findings 表指定字段（reflexion 自检降级用）。字段白名单防注入。
+
+    仅在写锁内执行，避免与 add_finding 并发写冲突；返回受影响行数。
+    """
+    allowed = {
+        "detail", "evidence", "remediation", "verification_status", "evidence_level",
+        "risk", "cwe", "impact", "endpoint", "http_method", "poc_script",
+        "evidence_meta", "cvss_score", "cvss_vector", "target_ref", "title", "category",
+    }
+    sets, vals = [], []
+    for k, v in fields.items():
+        if k in allowed:
+            sets.append(f"{k}=?")
+            vals.append(v)
+    if not sets:
+        return 0
+    with _db_lock:
+        c = _conn()
+        c.execute(f"UPDATE findings SET {', '.join(sets)} WHERE id=?", vals + [int(fid)])
+        n = c.rowcount
+        c.commit()
+        c.close()
+    return n
+
+
 def findings_page(scan_id, limit=50, offset=0):
     """P-03 发现分页：返回单页发现与总数，供大批量发现的扫描任务分批加载。"""
     c = _conn()
