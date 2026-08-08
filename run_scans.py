@@ -63,6 +63,12 @@ from scanner.plugin_base import ScanContext
 from scanner.plugins import load_plugins
 from scanner.port_scan import fingerprint_web, scan_ports
 from scanner.logctx import set_scan_context, clear_scan_context
+# F-10 桌面端 Agent 状态栏：把扫描阶段事件同步推送为 AI 副驾状态（无窗口时静默 no-op）。
+from scanner.agent_status import (
+    push_agent_status,
+    STATE_IDLE, STATE_THINKING, STATE_RECON, STATE_SCANNING,
+    STATE_VERIFYING, STATE_AWAITING_HUMAN, STATE_REPORTING, STATE_ERROR,
+)
 from scanner.ssrf import scan_ssrf
 from scanner.subdomain import scan_subdomain_assets
 from scanner.traversal import scan_traversal
@@ -132,6 +138,20 @@ def push_scan_event(scan_id, stage=None, status=None, note=None):
         # 注：pywebview 的 evaluate_js 自 v4 起设计为可从任意线程调用（内部路由到 GUI 线程），
         # 此处仍保留 try/except 作为最后兜底，避免 GUI 线程异常中断扫描 worker。
         pass
+
+
+def _agent_state_for_stage(stage):
+    """F-10：把扫描阶段名映射为 Agent 状态栏的 AI 副驾状态（关键字匹配，对阶段命名不敏感）。"""
+    s = (stage or "").lower()
+    if "report" in s:
+        return STATE_REPORTING
+    if "verify" in s or "exploit" in s:
+        return STATE_VERIFYING
+    if "recon" in s or "subdomain" in s or "fingerprint" in s or "scope" in s:
+        return STATE_RECON
+    if any(k in s for k in ("crawl", "port", "fuzz", "vuln", "scan", "web", "upload")):
+        return STATE_SCANNING
+    return STATE_THINKING
 
 
 
@@ -1011,6 +1031,19 @@ def process_scan(scan):
         # 阶段事件：同时落库（甘特图数据源）、推送前端（P-06 实时进度）、写结构化日志。
         record_stage_event(sid, st, stt, note)
         push_scan_event(sid, stage=st, status=stt, note=note)
+        # F-10：同步推送 AI 副驾状态栏（无窗口时静默 no-op；自动合并 scan 上下文）。
+        if stt == "failed":
+            push_agent_status(STATE_ERROR, note=note or st)
+        elif stt == "paused":
+            push_agent_status(STATE_AWAITING_HUMAN, note=note or "人工复核闸门待决")
+        elif stt == "start":
+            push_agent_status(_agent_state_for_stage(st), note=st)
+        elif stt == "done":
+            nxt = _NEXT_STAGE.get(st)
+            if nxt and nxt != st:
+                push_agent_status(_agent_state_for_stage(nxt), note=nxt)
+            else:
+                push_agent_status(STATE_IDLE, note=None)
         log_adapter.info("stage %s -> %s%s", st, stt,
                          f" ({note})" if note else "")
 

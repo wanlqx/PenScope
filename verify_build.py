@@ -56,6 +56,7 @@ EXPECTED_MODULES = [
     "scanner.router",     # P4 启发式路由调度层（胜者 B skill 路由固化）
     "scanner.evidence_store",  # P4 证据记忆落盘（跨扫描去噪）
     "scanner.advanced_injection",  # P5 CWE 缺口补齐（SSTI/XXE/JWT/NoSQL/IDOR）
+    "scanner.agent_status",  # F-10 桌面端 Agent 状态栏（状态模型 + 推送 seam）
     "scanner.open_redirect",  # v1.4.0
     "scanner.scope",       # v1.4.2 AP-001 重定向作用域围栏助手（scope-aware）
     "scanner.mail_probe",  # v1.3.7

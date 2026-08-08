@@ -46,6 +46,42 @@
     }
   };
 
+  // F-10：桌面端 Agent 状态栏推送入口。Python 在阶段事件后调用本函数，
+  // 把 AI 副驾当前所处阶段（思考/侦查/扫描/验证/待人工/出报告/出错）渲染到状态栏。
+  // 状态留存于模块级 _agentState，renderStatusBar 每 8s 重渲时回显，避免被刷新冲掉。
+  var _agentState = { state: "idle", note: null };
+  var _AGENT_LABELS = {
+    zh: { idle: "空闲", thinking: "推理中", recon: "侦查中", scanning: "扫描中",
+          verifying: "验证中", awaiting_human: "待人工复核", reporting: "生成报告", error: "出错" },
+    en: { idle: "Idle", thinking: "Thinking", recon: "Recon", scanning: "Scanning",
+          verifying: "Verifying", awaiting_human: "Awaiting review", reporting: "Reporting", error: "Error" }
+  };
+  function _agentDotClass(state) {
+    switch (state) {
+      case "thinking": return "think";
+      case "recon": return "recon";
+      case "scanning": return "run";
+      case "verifying": return "verify";
+      case "awaiting_human": return "human";
+      case "reporting": return "report";
+      case "error": return "err";
+      default: return "";
+    }
+  }
+  function _renderAgentStatus() {
+    var el = document.getElementById("sb-agent");
+    if (!el) return;
+    var lbl = (_AGENT_LABELS[settings.language] || _AGENT_LABELS.zh)[_agentState.state] || _agentState.state;
+    var txt = lbl + (_agentState.note ? " · " + _agentState.note : "");
+    el.innerHTML = '<span class="sb-dot ' + _agentDotClass(_agentState.state) + '"></span>' +
+                   '<span class="sb-agent-txt">' + esc(txt) + '</span>';
+  }
+  window.__autopentestOnAgentStatus = function (payload) {
+    if (!payload) return;
+    _agentState = { state: payload.state || "idle", note: payload.note || null };
+    _renderAgentStatus();
+  };
+
   // 方案B 事件流渲染：局部更新 #evt-feed，不重渲整个仪表盘
   function renderEvtFeed() {
     var box = document.getElementById("evt-feed");
@@ -426,7 +462,9 @@
       '<span class="sb-item">' + esc(t("statusBarScans")) + ': <b id="sb-scans">—</b></span>' +
       '<span class="sb-item">' + esc(t("statusBarReviews")) + ': <b id="sb-reviews">—</b></span>' +
       '<span class="sb-spacer"></span>' +
+      '<span class="sb-item" id="sb-agent"></span>' +
       '<span class="sb-item">PenScope</span>';
+    _renderAgentStatus();  // F-10：重渲后回显当前 Agent 副驾状态（避免被 8s 刷新冲掉）
   }
   function refreshStatusBar() {
     if (!api) return;

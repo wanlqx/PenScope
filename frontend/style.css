@@ -392,6 +392,16 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline-offset:0
 .statusbar .sb-dot{width:8px;height:8px;border-radius:50%;background:var(--low);display:inline-block}
 .statusbar .sb-dot.run{background:var(--warn);animation:sbpulse 1.4s infinite}
 .statusbar .sb-spacer{flex:1}
+/* F-10 Agent 状态栏：AI 副驾阶段指示点（颜色区分思考/侦查/扫描/验证/待人工/报告/出错） */
+.statusbar .sb-dot.think{background:var(--accent-violet);animation:sbpulse 1.4s infinite}
+.statusbar .sb-dot.recon{background:var(--accent-cyan);animation:sbpulse 1.4s infinite}
+.statusbar .sb-dot.verify{background:#ffd166;animation:sbpulse 1.4s infinite}
+.statusbar .sb-dot.human{background:var(--warn);animation:sbpulse 1s infinite}
+.statusbar .sb-dot.report{background:#8be9fd;animation:sbpulse 1.4s infinite}
+.statusbar .sb-dot.err{background:var(--high);animation:sbpulse .8s infinite}
+.statusbar .sb-agent-txt{color:var(--text);font-size:12px}
+/* 视觉效果主开关关闭时，仅停用 Agent 指示点的脉冲动画（功能性状态文本仍可见） */
+body.fx-off .statusbar .sb-dot{animation:none!important}
 @keyframes sbpulse{0%,100%{opacity:1}50%{opacity:.35}}
 
 /* —— 命令面板（吸收 A 的 ⌘K） —— */

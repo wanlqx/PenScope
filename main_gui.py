@@ -36,6 +36,9 @@ logging.basicConfig(
 # 结构化日志格式化器（含扫描上下文注入）统一收容到 scanner.logctx，便于测试与复用。
 from scanner.logctx import CtxFormatter as _CtxFormatter
 
+# F-10 桌面端 Agent 状态栏：窗口创建后注册推送目标（与 set_push_window 同构）。
+from scanner.agent_status import set_agent_status_window
+
 for _h in logging.getLogger().handlers:
     _h.setFormatter(_CtxFormatter("%(asctime)s [%(levelname)s] %(message)s"))
 
@@ -299,6 +302,7 @@ def main():
         confirm_close=False,
     )
     run_scans.set_push_window(window)  # P-06：注册窗口，阶段事件即可主动推送前端
+    set_agent_status_window(window)    # F-10：注册窗口，Agent 状态栏推送目标
     window.events.closing += on_closing
 
     # ---- 自检测试驱动线程：等待前端桥就绪 → 触发 runSelfTest → 等待报告 → 退出 ----
