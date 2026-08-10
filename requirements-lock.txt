@@ -22,7 +22,7 @@ cryptography==50.0.0
     # via -r requirements.txt
 idna==3.18
     # via requests
-packaging==26.2
+packaging==26.3
     # via
     #   pyinstaller
     #   pyinstaller-hooks-contrib
