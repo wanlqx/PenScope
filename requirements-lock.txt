@@ -10,7 +10,7 @@ bottle==0.13.4
     # via pywebview
 certifi==2026.7.22
     # via requests
-cffi==2.1.0
+cffi==2.1.1
     # via
     #   clr-loader
     #   cryptography
