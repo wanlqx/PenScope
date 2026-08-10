@@ -41,6 +41,24 @@ knowledge_feed/
 frontend/prototypes/
 .workbuddy/
 
+# ---- 实战 / 一次性挖洞 scratch 脚本与运行产物（仅仓库根目录；非产品代码，勿跟踪） ----
+# 手动挖洞 / SRC 验证的一次性驱动脚本及其带时间戳的 JSON 产物；忽略以防 `git status`
+# 噪声与误 `git add .` 卷入。产品模块（scanner/ 下的 weak_pass/product_fp/product_intel、
+# scanner/data/、tests/ 等）不在此列，正常入库。
+/_manual_hunt*.py
+/_manual_hunt_*.json
+/_manual_report.py
+/_src_*.py
+/_src_*.json
+/_enum_lncc_subs.py
+/_lncc_subs_*.json
+/pen_xval_lncc.py
+/pen_xval_lncc.json
+/run_lncc_subs.py
+/verify_oa_leads.py
+/verify_oa_leads.json
+/verify_p5_live.py
+
 # ---- 二进制资源（由 make_icon.py 在构建时再生，见 build_nowrap.py） ----
 assets/icon.ico
 assets/tray.png
