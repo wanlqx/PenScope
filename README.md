@@ -2,7 +2,7 @@
 
 > AI 驱动的**自动化渗透测试**桌面工具（纯本地、无后端、无需登录）。
 
-**正式版 v1.0.0** · 下载见 [GitHub Releases](../../releases) · 仅用于已获书面授权的渗透测试。
+**正式版 v1.0.2** · 下载见 [GitHub Releases](../../releases) · 仅用于已获书面授权的渗透测试。
 
 [![CI](https://github.com/wanlqx/PenScope/actions/workflows/ci.yml/badge.svg)](https://github.com/wanlqx/PenScope/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/wanlqx/PenScope?label=release)](https://github.com/wanlqx/PenScope/releases)
@@ -35,6 +35,7 @@ PenScope 是一款面向安全测试人员 / 授权渗透测试场景的桌面�
 - **视觉效果可自主开关（新增）**：提供统一的「视觉效果」总开关，可一键开启 / 关闭所有动态与静态视觉特效——鼠标拖尾、自定义光标、背景粒子、扫描线、暗角、噪点与按钮光晕。关闭后恢复系统原生简洁外观，适合追求性能或纯净界面的场景；各特效亦可在设置中单独微调。
 - **定时 / 批量巡检**：可创建定时任务，对多个已授权目标周期性巡检。
 - **审计日志与合规留痕**：所有关键动作留痕，便于复盘与合规；近 90 天操作密度热力图可视化。
+- **桌面端实时 Agent 状态栏**：扫描进行时在界面常驻状态栏，以多色状态点 + 中英双语实时展示引擎各阶段（授权 → 探测 → 扫描 → 验证 → 报告）的就绪 / 进行 / 完成 / 等待复核 / 告警等状态，进度与阻塞点一目了然。
 - **插件化扩展框架**：继承 `BaseScanner` 的 `.py` 放入 `~/.autopentest/plugins/`，经 `python -m scanner.plugins trust <file>` 登记信任后接入扫描流水线；默认「严格信任」模式杜绝静默任意代码执行。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 - **加密凭据保险库（可选）**：为需要登录态的目标提供 Fernet 加密凭据库与会话续期（默认关闭，需显式开启并二次确认），前端只返回掩码，后端绝不回传明文密码。
 - **单文件分发**：打包为单个 `PenScope.exe`，双击即用，含系统托盘（关闭窗口最小化到托盘）。
