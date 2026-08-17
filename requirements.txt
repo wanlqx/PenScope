@@ -5,6 +5,6 @@ pywebview>=5.0
 pystray>=0.19
 Pillow>=10.0
 cryptography>=41.0   # scanner.vault / session_renew 硬依赖（Fernet 加密凭据保险库）
-pyinstaller>=6.0   # 仅打包时需要
+pyinstaller>=6.22.0   # 仅打包时需要
 # weasyprint>=60.0  # 可选：如需在应用内直接生成 PDF 报告，安装后可启用（较重，Windows 需额外 GTK 依赖）
 # pdfkit>=1.0.0     # 可选：另一种 PDF 生成方案（需系统安装 wkhtmltopdf）
