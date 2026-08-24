@@ -14,7 +14,7 @@ cffi==2.1.0
     # via
     #   clr-loader
     #   cryptography
-charset-normalizer==3.4.9
+charset-normalizer==3.5.1
     # via requests
 clr-loader==0.3.1
     # via pythonnet
