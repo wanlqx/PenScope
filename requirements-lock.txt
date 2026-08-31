@@ -38,7 +38,7 @@ pycparser==3.0
     # via cffi
 pyinstaller==6.21.0
     # via -r requirements.txt
-pyinstaller-hooks-contrib==2026.6
+pyinstaller-hooks-contrib==2026.7
     # via pyinstaller
 pystray==0.19.5
     # via -r requirements.txt
